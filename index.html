@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WeCoded — Gender Equity Art 2026</title>
+  <link href="css/modern-normalize.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+  <script src="js/script.js" defer></script>
+</head>
+
+<body>
+  <div class="page flex">
+    <header class="page__header">
+      <h1 class="visually-hidden">Gender Equity — Frontend Art</h1>
+    </header>
+
+    <main class="page__scene flex" role="main">
+        <section class="scene-female" data-side="female"></section>
+
+        <section class="scene-scales" aria-label="Scales which represent gender equity" role="img">
+          <!-- inline scales SVG for easier styling -->
+          <svg class="scene-scales-svg scales-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" role="img">
+            <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+              <path class="scales-svg__stem" d="M12 3v18"></path>
+              <path class="scales-svg__panpath left" d="m5 8 3 8a5 5 0 0 1-6 0zV7"></path>
+              <path class="scales-svg__panpath right" d="m19 8 3 8a5 5 0 0 1-6 0zV7"></path>
+              <path class="scales-svg__beam" d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"></path>
+              <path class="scales-svg__base" d="M7 21h10"></path>
+            </g>
+          </svg>
+          <!-- pan targets: invisible DOM anchors positioned over each cup to compute landing coords -->
+          <div class="pan-target pan-target--left debug" data-side="female" aria-hidden="true">
+            <ul class="pan-target__items flex" aria-live="polite">
+            <!-- items will be added dynamically -->
+          </ul>
+          </div>
+          <div class="pan-target pan-target--right debug" data-side="male" aria-hidden="true">
+            <ul class="pan-target__items flex" aria-live="polite">
+              <!-- items will be added dynamically -->
+            </ul>
+          </div>
+          <!-- soft ground shadow to add volume -->
+          <div class="scales-shadow" aria-hidden="true"></div>
+        </section>
+
+          <section class="scene-male" data-side="male"></section>
+        </main>   
+
+    <footer class="page__footer flex">
+      <p class="page__footer-note">&copy;Created for WeCoded 2026&nbsp;&mdash; Frontend Art: Gender Equity</p>
+    </footer>
+
+  </div>
+</body>
+
+</html>

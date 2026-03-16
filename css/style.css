@@ -1,0 +1,319 @@
+:root {
+  --right: #e8f4ff;
+  --left: #ffe6f3;
+  --accent-blue: rgb(43, 124, 255);
+  --accent-pink: rgb(255, 111, 168);
+}
+
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  clip: rect(0, 0, 0, 0);
+  overflow: hidden;
+}
+
+.flex {
+  display: flex;
+}
+
+/* ensure positioned pseudo-elements and overlays are relative to page (добавили позиционирование для псевдоэлементов и оверлеев, таких как весы) */
+.page {
+  position: relative;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(90deg, var(--left) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
+}
+
+/* Шаги по затемнению для женской стороны (увеличение номера класса через JS на элементе .page) */
+.page::before {
+  /* darkness overlay for female side; shown/adjusted via .page--female-dark-* classes */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44%;
+  pointer-events: none;
+  background: transparent;
+  z-index: 1;
+}
+
+/* Apply darkness overlay by toggling a class on the top-level .page element */
+.page.page--female-dark-1::before {
+  background: var(--accent-pink);
+  opacity: 0.22;
+}
+
+.page.page--female-dark-2::before {
+  background: var(--accent-pink);
+  opacity: 0.38;
+}
+
+.page.page--female-dark-3::before {
+  background: var(--accent-pink);
+  opacity: 0.54;
+}
+
+/* Scene layout and page background */
+.page__scene {
+  flex: 1 1 auto;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 320px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.scene-female {
+  width: 25%;
+  height: 100%;
+  background-image: url('../img/venus.svg');
+  background-repeat: no-repeat;
+  background-position: 20% 11%;
+  background-size: 100px 100px;
+  opacity: 0.12;
+  filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgb(255, 111, 168));
+}
+
+.scene-male {
+  width: 25%;
+  height: 100%;
+  background-image: url('../img/mars.svg');
+  background-repeat: no-repeat;
+  background-position: 80% 11%;
+  background-size: 100px 100px;
+  opacity: 0.12;
+  filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(43, 124, 255));
+}
+
+/* Scales container */
+.scene-scales {
+  /* bring scales above scene pseudo background icons */
+  position: relative;
+  width: 50%;
+  height: 100%;
+  z-index: 4;
+}
+
+/* Inline SVG controls */
+.scene-scales-svg {
+  width: 90%;
+  height: auto;
+  pointer-events: none;
+}
+
+.scene-scales-svg g {
+  stroke: currentColor;
+  stroke-width: 0.6;
+}
+
+/* Make pans visually wider by scaling their SVG path horizontally and nudging left/right so they stay aligned under the beam. */
+.scales-svg .scales-svg__panpath {
+  transform-box: fill-box;
+  transform-origin: 50% 35%;
+}
+
+.scales-svg .scales-svg__panpath.left {
+  transform: translateX(-4%) scaleX(1.22);
+}
+
+.scales-svg .scales-svg__panpath.right {
+  transform: translateX(4%) scaleX(1.22);
+}
+
+@media (max-width: 720px) {
+
+  .scales-svg .scales-svg__panpath.left,
+  .scales-svg .scales-svg__panpath.right {
+    transform: translateX(0) scaleX(1.12);
+  }
+}
+
+/* Add subtle metallic sheen using pseudo-element on container */
+/* Silver variant: cooler base color and subtler sheen */
+.scales-svg {
+  /* aged silver base */
+  color: rgba(150, 150, 155, 1);
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.12));
+}
+
+.scales-svg g {
+  fill: none;
+}
+
+.scales-svg .scales-svg__stem {
+  stroke-width: 1.2;
+  stroke-opacity: 0.95;
+}
+
+.scales-svg .scales-svg__beam,
+.scales-svg .scales-svg__base {
+  stroke-width: 1.0;
+  stroke-opacity: 0.95;
+}
+
+.scales-svg::after {
+  /* narrower sheen centered over the beam to avoid container edge artefacts */
+  content: "";
+  position: absolute;
+  left: 24%;
+  top: 6%;
+  width: 30%;
+  height: 48%;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.16) 20%, rgba(255, 255, 255, 0.06) 60%, rgba(255, 255, 255, 0) 100%);
+  mix-blend-mode: overlay;
+  transform: rotate(-10deg);
+  filter: blur(5px);
+  border-radius: 40px;
+}
+
+/* ground shadow to add volume */
+.scales-shadow {
+  /* subtle shadow under the scales base only */
+  width: 42%;
+  margin-top: -12px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.08) 40%, rgba(0, 0, 0, 0) 80%);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* Pan-target anchors placed over each cup to compute landing coords */
+.pan-target {
+  /* Anchors over each cup — sized container so landed items can be positioned inside */
+  position: absolute;
+  width: 150px;
+  height: 75px;
+  pointer-events: none;
+  opacity: 0;
+  /* set to 1 or add .debug for visual tuning */
+}
+
+.pan-target--left {
+  left: 7%;
+  top: 58%;
+}
+
+.pan-target--right {
+  left: 62%;
+  top: 58%;
+}
+
+.pan-target__items {
+  position: absolute;
+  inset: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+/* landed items are smaller inside the pans */
+.pan-target__item--landed img {
+  left: 50%;
+  transform: translateX(-50%);
+  /* bottom = 6px + index * 18px where index is provided by --stack-index */
+  bottom: calc(6px + (var(--stack-index, 0) * 18px));
+  pointer-events: none;
+  width: 36px;
+  height: 36px;
+}
+
+/* preserve larger size for laptops placed in the pan */
+.pan-target__item.is-laptop img {
+  width: 48px;
+  height: 48px;
+}
+
+/* Debug helper: toggle .debug on .pan-target while tuning positions */
+.pan-target.debug {
+  opacity: 0.18;
+  background: rgba(255, 111, 168, 1);
+  outline: 1px dashed rgba(0, 0, 0, 1);
+}
+
+/* floating ghost used during fall animation */
+.falling-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  transform: translate(var(--tx, 0px), var(--ty, 0px));
+  opacity: 0;
+  transition: transform 700ms cubic-bezier(.22, .9, .35, 1), opacity 260ms ease-in;
+}
+
+.falling-ghost.land {
+  opacity: 1;
+}
+
+/* Footer styles */
+.page__footer {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 12px 16px;
+}
+
+.page__footer-note {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+}
+
+/* Основная анимация падения (применяется при добавлении новых элементов) */
+@keyframes fallIn {
+  0% {
+    transform: translateY(-240px) rotate(-12deg);
+    opacity: 0;
+  }
+
+  60% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+}
+
+.pan-target__item--falling {
+  animation: fallIn 700ms ease-out both;
+}

@@ -1,0 +1,82 @@
+/*! modern-normalize v1.1.0
+   Copyright 2019-2020 Sindre Sorhus and contributors
+   Available under the MIT License */
+
+/* Document
+   ========================================================================== */
+
+html {
+  line-height: 1.15;
+  /* 1 */
+  -webkit-text-size-adjust: 100%;
+  /* 2 */
+}
+
+/* Sections */
+body {
+  margin: 0;
+}
+
+main {
+  display: block;
+}
+
+/* Typography */
+h1 {
+  font-size: 2em;
+  margin: 0.67em 0;
+}
+
+pre {
+  font-family: monospace, monospace;
+  font-size: 1em;
+}
+
+/* Links */
+a {
+  background-color: transparent;
+}
+
+/* Forms */
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 100%;
+  line-height: 1.15;
+  margin: 0;
+}
+
+button,
+select {
+  text-transform: none;
+}
+
+/* Images */
+img {
+  border-style: none;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
