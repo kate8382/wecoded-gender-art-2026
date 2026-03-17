@@ -32,14 +32,13 @@
           </svg>
           <!-- pan targets: invisible DOM anchors positioned over each cup to compute landing coords -->
           <div class="pan-target pan-target--left debug" data-side="female" aria-hidden="true">
-            <ul class="pan-target__items flex" aria-live="polite">
-            <!-- items will be added dynamically -->
-          </ul>
-          </div>
-          <div class="pan-target pan-target--right debug" data-side="male" aria-hidden="true">
-            <ul class="pan-target__items flex" aria-live="polite">
+            <div class="pan-target__main" aria-hidden="true"></div>
+            <ul class="pan-target__items" aria-live="polite">
               <!-- items will be added dynamically -->
             </ul>
+          </div>
+          <div class="pan-target pan-target--right debug" data-side="male" aria-hidden="true">
+            <div class="pan-target__main" aria-hidden="true"></div>
           </div>
           <!-- soft ground shadow to add volume -->
           <div class="scales-shadow" aria-hidden="true"></div>

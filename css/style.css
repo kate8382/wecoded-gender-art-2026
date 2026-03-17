@@ -3,6 +3,9 @@
   --left: #ffe6f3;
   --accent-blue: rgb(43, 124, 255);
   --accent-pink: rgb(255, 111, 168);
+  --light-pink: rgba(255, 111, 168, 0.66);
+  --medium-pink: rgba(255, 111, 168, 0.88);
+  --text-color: #333;
 }
 
 html {
@@ -13,6 +16,12 @@ html {
 *::before,
 *::after {
   box-sizing: inherit;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text-color);
+  background: transparent;
 }
 
 ul {
@@ -61,24 +70,20 @@ svg {
   top: 0;
   width: 44%;
   pointer-events: none;
-  background: transparent;
   z-index: 1;
 }
 
 /* Apply darkness overlay by toggling a class on the top-level .page element */
 .page.page--female-dark-1::before {
-  background: var(--accent-pink);
-  opacity: 0.22;
+  background: linear-gradient(90deg, var(--light-pink) 0%, rgba(255, 111, 168, 0.66) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
 }
 
 .page.page--female-dark-2::before {
-  background: var(--accent-pink);
-  opacity: 0.38;
+  background: linear-gradient(90deg, var(--medium-pink) 0%, rgba(255, 111, 168, 0.88) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
 }
 
 .page.page--female-dark-3::before {
-  background: var(--accent-pink);
-  opacity: 0.54;
+  background: linear-gradient(90deg, var(--accent-pink) 0%, rgba(255, 111, 168, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
 }
 
 /* Scene layout and page background */
@@ -189,7 +194,8 @@ svg {
   top: 6%;
   width: 30%;
   height: 48%;
-  pointer-events: none;
+  bottom: 36px;
+  /* lift main laptop above stacked items */
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.16) 20%, rgba(255, 255, 255, 0.06) 60%, rgba(255, 255, 255, 0) 100%);
   mix-blend-mode: overlay;
   transform: rotate(-10deg);
@@ -207,53 +213,93 @@ svg {
   pointer-events: none;
 }
 
+/* Чаши весов */
+/* Prevent pointer interactions inside pans and their contents (avoids accidental hover/click
+   on decorative elements). This is applied once instead of repeating `pointer-events: none` everywhere. */
+.pan-target,
+.pan-target *,
+.falling-ghost {
+  pointer-events: none;
+}
+
 /* Pan-target anchors placed over each cup to compute landing coords */
 .pan-target {
   /* Anchors over each cup — sized container so landed items can be positioned inside */
   position: absolute;
-  width: 150px;
-  height: 75px;
-  pointer-events: none;
-  opacity: 0;
-  /* set to 1 or add .debug for visual tuning */
+  width: 200px;
+  /* увеличил ширину, чтобы в чашу помещалось больше элементов */
+  min-height: 100px;
 }
 
-.pan-target--left {
-  left: 7%;
-  top: 58%;
-}
-
-.pan-target--right {
-  left: 62%;
-  top: 58%;
+.pan-target.pan-target--left {
+  left: 3%;
+  top: 56%;
 }
 
 .pan-target__items {
   position: absolute;
+  z-index: 50;
   inset: 0;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
+  width: 100%;
+  min-height: 50px;
+}
+
+/* Упавшие элементы должны быть ниже основного ноутбука */
+.pan-target__item,
+.pan-target__item--landed {
+  z-index: 100;
+}
+
+.pan-target.pan-target--right {
+  left: 57%;
+  top: 58%;
+}
+
+.pan-target--right.pan-target__main,
+.pan-target--left.pan-target__main {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: 100%;
+}
+
+.pan-target__main img {
+  width: 84px;
+  max-width: none;
+  /* unify both laptops to 84px by default */
+  height: auto;
+  transition: width 280ms ease;
+  /* animate size changes */
+}
+
+/* Ensure main laptop is above fallen items and ghosts */
+.pan-target__main {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
   pointer-events: none;
 }
 
-/* landed items are smaller inside the pans */
-.pan-target__item--landed img {
+/* Landed items should be positioned relative to the pan (stacked) */
+.pan-target__item--landed {
+  position: absolute;
   left: 50%;
   transform: translateX(-50%);
   /* bottom = 6px + index * 18px where index is provided by --stack-index */
   bottom: calc(6px + (var(--stack-index, 0) * 18px));
+}
+
+/* landed items are smaller inside the pans */
+.pan-target__item--landed img {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
   pointer-events: none;
   width: 36px;
   height: 36px;
-}
-
-/* preserve larger size for laptops placed in the pan */
-.pan-target__item.is-laptop img {
-  width: 48px;
-  height: 48px;
 }
 
 /* Debug helper: toggle .debug on .pan-target while tuning positions */
@@ -273,6 +319,8 @@ svg {
   transform: translate(var(--tx, 0px), var(--ty, 0px));
   opacity: 0;
   transition: transform 700ms cubic-bezier(.22, .9, .35, 1), opacity 260ms ease-in;
+  z-index: 40;
+  /* below the main laptop which has higher z-index */
 }
 
 .falling-ghost.land {
@@ -294,7 +342,6 @@ svg {
 .page__footer-note {
   margin: 0;
   font-size: 14px;
-  color: #333;
 }
 
 /* Основная анимация падения (применяется при добавлении новых элементов) */
