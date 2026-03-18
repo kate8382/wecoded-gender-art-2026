@@ -1,21 +1,67 @@
-/* Dropper — черновой OOP-класс для падения элементов в чаши весов.
-   Подход: hybrid animation — JS вычисляет координаты целевой .pan-target,
-   создаёт плавающий .falling-ghost, задаёт CSS-переменные для смещения
-   и размера, добавляет класс .land для запуска перехода, затем по завершении
-   создаёт окончательный элемент в .pan-target__items и удаляет ghost.
-
-   Простая публичная API:
-   - new Dropper(opts)
-   - drop(assetSrc, options) -> Promise resolves когда элемент приземлён
-
-   Пока черновик — позже добавим очередь, retry и семантику затемнения.
-*/
-
 (function () {
   class Dropper {
-    constructor({ containerSelector = '.page', panSelector = '.pan-target' } = {}) {
-      this.root = document.querySelector(containerSelector) || document.body;
-      this.pans = Array.from(document.querySelectorAll(panSelector));
+    constructor(opts = {}) {
+      const defaults = {
+        containerSelector: '.page',
+        panSelector: '.pan-target',
+        // layout constants (used in multiple places)
+        itemW: 36,
+        itemH: 36,
+        gap: 4,
+        rowSpacing: 22,
+        baseBottom: 12,
+        // laptop sizing
+        laptopInitialWidth: 84,
+        laptopMinWidth: 72,
+        laptopMaxCount: 6,
+        // visual tuning
+        overlap: 2,
+        // default falling sequence (can be overridden via opts)
+        defaultSequence: [
+          { src: 'img/laptop.svg', side: 'female', darken: 0, delay: 400 },
+          { src: 'img/laptop.svg', side: 'male', darken: 0, delay: 600 },
+          { src: 'img/house.svg', side: 'female', darken: 1, delay: 700 },
+          { src: 'img/baby-carriage.svg', side: 'female', darken: 1, delay: 700 },
+          { src: 'img/cooking-pot.svg', side: 'female', darken: 1, delay: 700 },
+          { src: 'img/shopping-cart.svg', side: 'female', darken: 1, delay: 700 },
+          { src: 'img/wash-machine.svg', side: 'female', darken: 1, delay: 700 },
+          { src: 'img/ironing-2.svg', side: 'female', darken: 1, delay: 700 }
+        ],
+        // whether to auto-run default sequence when created (can be controlled externally)
+        autoRun: true
+      };
+
+      this.opts = Object.assign({}, defaults, opts);
+      // Try to read overrides from CSS custom properties (defined on :root)
+      try {
+        const css = getComputedStyle(document.documentElement);
+        const readPx = (name) => {
+          const v = css.getPropertyValue(name);
+          if (!v) return undefined;
+          const n = parseFloat(v.replace('px', '').trim());
+          return Number.isFinite(n) ? n : undefined;
+        };
+
+        const cssOverrides = {
+          itemW: readPx('--pan-item-w'),
+          itemH: readPx('--pan-item-h'),
+          gap: readPx('--pan-gap'),
+          rowSpacing: readPx('--pan-row-spacing'),
+          baseBottom: readPx('--pan-base-bottom'),
+          overlap: readPx('--pan-overlap'),
+          laptopInitialWidth: readPx('--laptop-initial-width'),
+          laptopMinWidth: readPx('--laptop-min-width'),
+          laptopMaxCount: readPx('--laptop-max-count')
+        };
+
+        Object.keys(cssOverrides).forEach(k => {
+          if (typeof cssOverrides[k] !== 'undefined') this.opts[k] = cssOverrides[k];
+        });
+      } catch (e) {
+        // ignore if running in non-browser env
+      }
+      this.root = document.querySelector(this.opts.containerSelector) || document.body;
+      this.pans = Array.from(document.querySelectorAll(this.opts.panSelector));
       this._ensureGhost();
     }
 
@@ -25,25 +71,16 @@
         'img/laptop.svg',
         'img/house.svg',
         'img/baby-carriage.svg',
-        'img/shopping-cart.svg',
         'img/cooking-pot.svg',
+        'img/shopping-cart.svg',
         'img/wash-machine.svg',
         'img/ironing-2.svg'
       ];
     }
 
-    // Метод, возвращающий стандартную последовательность падений
+    // Метод, возвращающий стандартную последовательность падений (можно переопределить через opts)
     getDefaultSequence() {
-      return [
-        { src: 'img/laptop.svg', side: 'female', size: 84, darken: 0, delay: 400 },
-        { src: 'img/laptop.svg', side: 'male', size: 84, darken: 0, delay: 600 },
-        { src: 'img/house.svg', side: 'female', size: 36, darken: 1, delay: 700 },
-        { src: 'img/baby-carriage.svg', side: 'female', size: 36, darken: 1, delay: 700 },
-        { src: 'img/shopping-cart.svg', side: 'female', size: 36, darken: 1, delay: 700 },
-        { src: 'img/cooking-pot.svg', side: 'female', size: 36, darken: 1, delay: 700 },
-        { src: 'img/wash-machine.svg', side: 'female', size: 36, darken: 1, delay: 700 },
-        { src: 'img/ironing-2.svg', side: 'female', size: 36, darken: 1, delay: 700 }
-      ];
+      return (this.opts.defaultSequence || []).slice();
     }
 
     // Метод, создающий плавающий элемент для анимации падения
@@ -82,10 +119,10 @@
       const total = items.length;
       if (!total) return;
 
-      const itemW = 36; // ширина маленького изображения внутри чаши
-      const gap = 6; // горизонтальный промежуток
-      const rowSpacing = 22; // вертикальный шаг между рядами (увеличен чтобы не накладываться на ноутбук)
-      const baseBottom = 12; // базовый отступ от нижней кромки чаши
+      const itemW = this.opts.itemW; // ширина маленького изображения внутри чаши
+      const gap = this.opts.gap; // горизонтальный промежуток
+      const rowSpacing = this.opts.rowSpacing; // вертикальный шаг между рядами
+      const baseBottom = this.opts.baseBottom; // базовый отступ от нижней кромки чаши
       // вычислим, сколько колонок реально помещается в ширину контейнера
       const containerWidth = list.clientWidth || list.getBoundingClientRect().width || 180;
       const maxBottomCapacity = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
@@ -131,14 +168,105 @@
       if (!mainImg) return;
       const list = pan.querySelector('.pan-target__items');
       const count = list ? list.querySelectorAll('.pan-target__item').length : 0;
-      const initial = 84;
-      const min = 72;
-      const maxCount = 6;
+      const initial = this.opts.laptopInitialWidth;
+      const min = this.opts.laptopMinWidth;
+      const maxCount = this.opts.laptopMaxCount;
       const diff = initial - min;
       const perItem = diff / maxCount;
       const newWidth = Math.max(min, Math.round(initial - count * perItem));
       mainImg.style.width = newWidth + 'px';
       mainImg.style.zIndex = 200;
+    }
+
+    // Ensure the .pan-target__items container grows to accommodate stacked items
+    _updatePanItemsContainerHeight(list, pan) {
+      if (!list) return;
+      const items = Array.from(list.querySelectorAll('.pan-target__item'));
+      const total = items.length;
+      if (!total) {
+        list.style.height = '';
+        list.style.top = '';
+        list.style.bottom = '';
+        return;
+      }
+
+      const itemW = this.opts.itemW;
+      const gap = this.opts.gap;
+      const rowSpacing = this.opts.rowSpacing;
+      const baseBottom = this.opts.baseBottom;
+      const itemH = this.opts.itemH;
+
+      const containerWidth = list.clientWidth || list.getBoundingClientRect().width || 180;
+      const maxCols = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
+
+      // compute rows like in _layoutPanItems
+      let remaining = total;
+      let maxCap = maxCols;
+      let rows = 0;
+      while (remaining > 0) {
+        const rowCount = Math.min(maxCap, remaining);
+        remaining -= rowCount;
+        maxCap = Math.max(1, maxCap - 1);
+        rows++;
+      }
+
+      // required height: bottom offset of topmost row + item height + small padding
+      const required = baseBottom + (rows - 1) * rowSpacing + itemH + 6;
+
+      // set explicit height on the items container and anchor it to the bottom of pan
+      list.style.height = required + 'px';
+      list.style.top = 'auto';
+      list.style.bottom = baseBottom + 'px';
+      // avoid changing pan size — allow items to overflow upward if necessary
+      if (pan) {
+        pan.style.minHeight = pan.style.minHeight || getComputedStyle(pan).minHeight;
+      }
+    }
+
+    // Adjust main laptop vertical position so it visually rests on top of the pile
+    _adjustMainForPile(pan) {
+      if (!pan) return;
+      const list = pan.querySelector('.pan-target__items');
+      const mainWrap = pan.querySelector('.pan-target__main');
+      if (!list || !mainWrap) return;
+
+      // ensure the wrapper is positioned (it should already be by CSS)
+      mainWrap.style.position = mainWrap.style.position || 'absolute';
+      // force high stacking for the wrapper
+      mainWrap.style.zIndex = 9999;
+
+      const items = Array.from(list.querySelectorAll('.pan-target__item'));
+      const total = items.length;
+      const baseBottom = this.opts.baseBottom;
+      const rowSpacing = this.opts.rowSpacing;
+      const itemH = this.opts.itemH;
+
+      if (!total) {
+        mainWrap.style.bottom = baseBottom + 'px';
+        return;
+      }
+
+      // compute number of rows using the same algorithm as _layoutPanItems
+      const containerWidth = list.clientWidth || list.getBoundingClientRect().width || 180;
+      const itemW = this.opts.itemW;
+      const gap = this.opts.gap;
+      const maxCols = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
+
+      let remaining = total;
+      let maxCap = maxCols;
+      let rows = 0;
+      while (remaining > 0) {
+        const rowCount = Math.min(maxCap, remaining);
+        remaining -= rowCount;
+        maxCap = Math.max(1, maxCap - 1);
+        rows++;
+      }
+
+      const topRowBottom = baseBottom + (rows - 1) * rowSpacing;
+      // position wrapper so the main image visually rests on the pile; small negative overlap to look natural
+      const overlap = this.opts.overlap; // сколько пикселей main должен перекрывать верхний ряд для лучшего визуального эффекта
+      const targetBottom = topRowBottom + itemH - overlap;
+      mainWrap.style.bottom = Math.max(baseBottom, targetBottom) + 'px';
     }
 
     drop(assetSrc, { side = 'female', size = null, offsetX = 0, offsetY = 0 } = {}) {
@@ -157,7 +285,7 @@
           ghost.setAttribute('aria-hidden', 'true');
           document.body.appendChild(ghost);
 
-          const ghostSize = size || Number(pan.dataset.size) || (isLaptop ? 84 : 36);
+          const ghostSize = size || Number(pan.dataset.size) || (isLaptop ? this.opts.laptopInitialWidth : this.opts.itemW);
           ghost.src = assetSrc;
           ghost.style.width = `${ghostSize}px`;
           ghost.style.height = `${ghostSize}px`;
@@ -200,8 +328,9 @@
             const img = document.createElement('img');
             img.src = assetSrc;
             img.alt = '';
-            img.style.width = isLaptop ? '84px' : '36px';
-            img.style.height = isLaptop ? 'auto' : '36px';
+            // sizes are controlled by CSS variables; no need to set inline widths here
+            img.style.width = '';
+            img.style.height = '';
             img.style.position = 'relative';
             li.appendChild(img);
             li.style.zIndex = '100';
@@ -212,10 +341,17 @@
               mImg.src = assetSrc;
               mImg.alt = '';
               mImg.className = 'pan-target__main-img';
-              mImg.style.width = '84px';
+              // initial width comes from CSS variable; JS will adjust via _updateLaptopScaleForPan
+              // keep transition/zIndex but avoid duplicating size here
               mImg.style.transition = 'width 260ms ease';
               mImg.style.zIndex = 200;
               main.appendChild(mImg);
+              // small per-side baseline tweak: left (female) slightly lower so it sits better on SVG curve
+              if (pan && pan.dataset && pan.dataset.side === 'female') {
+                main.style.bottom = '8px';
+              } else {
+                main.style.bottom = '12px';
+              }
               pan.classList.add('has-main');
             } else if (list) {
               const idx = list.querySelectorAll('.pan-target__item').length;
@@ -225,6 +361,10 @@
                 // restore JS pyramid layout (горка) and then update laptop scale
                 this._layoutPanItems(list);
                 this._updateLaptopScaleForPan(pan);
+                // ensure the items container grows so stacked items don't overflow visually
+                this._updatePanItemsContainerHeight(list, pan);
+                // adjust main laptop vertical position to rest on the pile
+                this._adjustMainForPile(pan);
               } catch (e) {
                 // ignore
               }
@@ -253,15 +393,15 @@
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения
     async runSequence(steps = []) {
       const applyDarken = (delta) => {
-        const page = document.querySelector('.page');
-        if (!page || !delta) return;
+        const pageEl = document.querySelector('.page');
+        if (!pageEl || !delta) return;
         let current = 0;
-        if (page.classList.contains('page--female-dark-1')) current = 1;
-        if (page.classList.contains('page--female-dark-2')) current = 2;
-        if (page.classList.contains('page--female-dark-3')) current = 3;
+        if (pageEl.classList.contains('page--female-dark-1')) current = 1;
+        if (pageEl.classList.contains('page--female-dark-2')) current = 2;
+        if (pageEl.classList.contains('page--female-dark-3')) current = 3;
         const next = Math.min(3, current + delta);
-        page.classList.remove('page--female-dark-1', 'page--female-dark-2', 'page--female-dark-3');
-        if (next > 0) page.classList.add(`page--female-dark-${next}`);
+        pageEl.classList.remove('page--female-dark-1', 'page--female-dark-2', 'page--female-dark-3');
+        if (next > 0) pageEl.classList.add(`page--female-dark-${next}`);
       };
 
       // определяем, является ли шаг падением ноутбука, для оптимизации соседних падений ноутбуков в разные чаши
@@ -307,9 +447,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   try {
     const d = new Dropper();
-    const seq = d.getDefaultSequence();
-    // run in background (no await) — errors are caught
-    d.runSequence(seq).catch(err => console.warn('Dropper sequence error', err));
+    // overlay is implemented via CSS on `.page::after`; no dynamic element needed
+    if (d.opts && d.opts.autoRun) {
+      const seq = d.getDefaultSequence();
+      // run in background (no await) — errors are caught
+      d.runSequence(seq).catch(err => console.warn('Dropper sequence error', err));
+    }
   } catch (err) {
     console.warn('Failed to auto-run Dropper sequence', err);
   }

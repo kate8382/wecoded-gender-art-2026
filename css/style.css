@@ -6,6 +6,16 @@
   --light-pink: rgba(255, 111, 168, 0.66);
   --medium-pink: rgba(255, 111, 168, 0.88);
   --text-color: #333;
+  /* pan / layout tuning exposed as CSS custom properties so JS can read them */
+  --pan-item-w: 36px;
+  --pan-item-h: 36px;
+  --pan-gap: 4px;
+  --pan-row-spacing: 22px;
+  --pan-base-bottom: 12px;
+  --pan-overlap: 2px;
+  --laptop-initial-width: 84px;
+  --laptop-min-width: 72px;
+  --laptop-max-count: 6;
 }
 
 html {
@@ -21,7 +31,8 @@ html {
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text-color);
-  background: transparent;
+  /* Move page gradient to body for simpler full-page background handling */
+  background: linear-gradient(90deg, var(--left) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
 }
 
 ul {
@@ -58,7 +69,7 @@ svg {
   flex-direction: column;
   width: 100%;
   height: 100vh;
-  background: linear-gradient(90deg, var(--left) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
+  background: transparent;
 }
 
 /* Шаги по затемнению для женской стороны (увеличение номера класса через JS на элементе .page) */
@@ -68,9 +79,9 @@ svg {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 1;
   width: 44%;
   pointer-events: none;
-  z-index: 1;
 }
 
 /* Apply darkness overlay by toggling a class on the top-level .page element */
@@ -88,9 +99,12 @@ svg {
 
 /* Scene layout and page background */
 .page__scene {
+  /* needed for decorative pseudo-elements */
+  position: relative;
   flex: 1 1 auto;
   flex-direction: row;
-  justify-content: space-between;
+  /* center the scales section in the scene */
+  justify-content: center;
   align-items: center;
   width: 100%;
   min-height: 320px;
@@ -98,25 +112,37 @@ svg {
   overflow: hidden;
 }
 
-.scene-female {
-  width: 25%;
+/* Decorative background icons moved to .page__scene pseudo-elements
+   Keep visual settings from previous .scene-female/.scene-male styles: size, opacity, shadow */
+.page__scene::before,
+.page__scene::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  /* place icons above the page overlay */
   height: 100%;
-  background-image: url('../img/venus.svg');
-  background-repeat: no-repeat;
-  background-position: 20% 11%;
-  background-size: 100px 100px;
+  width: 25%;
+  pointer-events: none;
   opacity: 0.12;
+  background-repeat: no-repeat;
+  background-size: 100px 100px;
+  /* behind the scales (scales use z-index:6) */
+  filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(0, 0, 0, 0.06));
+}
+
+.page__scene::before {
+  left: 0;
+  background-image: url('../img/venus.svg');
+  background-position: 20% 11%;
   filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgb(255, 111, 168));
 }
 
-.scene-male {
-  width: 25%;
-  height: 100%;
+.page__scene::after {
+  right: 0;
   background-image: url('../img/mars.svg');
-  background-repeat: no-repeat;
   background-position: 80% 11%;
   background-size: 100px 100px;
-  opacity: 0.12;
   filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(43, 124, 255));
 }
 
@@ -124,9 +150,13 @@ svg {
 .scene-scales {
   /* bring scales above scene pseudo background icons */
   position: relative;
-  width: 50%;
+  z-index: 6;
+  width: 100%;
+  /* limit max width so layout stays predictable */
+  max-width: 680px;
   height: 100%;
-  z-index: 4;
+  /* center within flex container */
+  margin: 0 auto;
 }
 
 /* Inline SVG controls */
@@ -166,6 +196,7 @@ svg {
 /* Add subtle metallic sheen using pseudo-element on container */
 /* Silver variant: cooler base color and subtler sheen */
 .scales-svg {
+  position: relative;
   /* aged silver base */
   color: rgba(150, 150, 155, 1);
   filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.12));
@@ -194,7 +225,7 @@ svg {
   top: 6%;
   width: 30%;
   height: 48%;
-  bottom: 36px;
+  /* avoid fixed bottom offset so the sheen scales with the SVG/container */
   /* lift main laptop above stacked items */
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.16) 20%, rgba(255, 255, 255, 0.06) 60%, rgba(255, 255, 255, 0) 100%);
   mix-blend-mode: overlay;
@@ -226,14 +257,22 @@ svg {
 .pan-target {
   /* Anchors over each cup — sized container so landed items can be positioned inside */
   position: absolute;
-  width: 200px;
-  /* увеличил ширину, чтобы в чашу помещалось больше элементов */
+  /* ensure the whole pan (including `.pan-target__main`) sits above landed items */
+  z-index: 220;
+  /* make pan-target size responsive inside .scene-scales; keep a sensible min-width */
+  width: 27%;
+  min-width: 140px;
   min-height: 100px;
+  /* center the anchor horizontally around the percentage-based `left` value */
+  transform: translateX(-50%);
+  /* allow dropped items to grow upward without forcing the pan to resize */
+  overflow: visible;
 }
 
 .pan-target.pan-target--left {
-  left: 3%;
-  top: 56%;
+  /* positioned as percentage of .scene-scales width */
+  left: 18%;
+  top: 57%;
 }
 
 .pan-target__items {
@@ -251,8 +290,9 @@ svg {
 }
 
 .pan-target.pan-target--right {
-  left: 57%;
-  top: 58%;
+  /* positioned as percentage of .scene-scales width */
+  left: 72%;
+  top: 57%;
 }
 
 .pan-target--right.pan-target__main,
@@ -262,15 +302,15 @@ svg {
   transform: translateX(-50%);
   z-index: 60;
   width: 100%;
+  bottom: 12px;
 }
 
 .pan-target__main img {
-  width: 84px;
+  width: var(--laptop-initial-width);
   max-width: none;
-  /* unify both laptops to 84px by default */
+  /* unify both laptops to initial width by default */
   height: auto;
   transition: width 280ms ease;
-  /* animate size changes */
 }
 
 /* Ensure main laptop is above fallen items and ghosts */
@@ -280,6 +320,7 @@ svg {
   transform: translateX(-50%);
   z-index: 200;
   pointer-events: none;
+  bottom: 12px;
 }
 
 /* Landed items should be positioned relative to the pan (stacked) */
@@ -329,8 +370,6 @@ svg {
 
 /* Footer styles */
 .page__footer {
-  position: relative;
-  z-index: 5;
   flex: 0 0 auto;
   justify-content: center;
   align-items: center;

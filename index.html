@@ -17,8 +17,6 @@
     </header>
 
     <main class="page__scene flex" role="main">
-        <section class="scene-female" data-side="female"></section>
-
         <section class="scene-scales" aria-label="Scales which represent gender equity" role="img">
           <!-- inline scales SVG for easier styling -->
           <svg class="scene-scales-svg scales-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" role="img">
@@ -31,7 +29,7 @@
             </g>
           </svg>
           <!-- pan targets: invisible DOM anchors positioned over each cup to compute landing coords -->
-          <div class="pan-target pan-target--left debug" data-side="female" aria-hidden="true">
+          <div class="pan-target pan-target--left" data-side="female" aria-hidden="true">
             <div class="pan-target__main" aria-hidden="true"></div>
             <ul class="pan-target__items" aria-live="polite">
               <!-- items will be added dynamically -->
@@ -43,8 +41,6 @@
           <!-- soft ground shadow to add volume -->
           <div class="scales-shadow" aria-hidden="true"></div>
         </section>
-
-          <section class="scene-male" data-side="male"></section>
         </main>   
 
     <footer class="page__footer flex">
