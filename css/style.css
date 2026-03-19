@@ -1,6 +1,8 @@
 :root {
   --right: #e8f4ff;
   --left: #ffe6f3;
+  --left-bg: var(--left);
+  --darkness-opacity: 0;
   --accent-blue: rgb(43, 124, 255);
   --accent-pink: rgb(255, 111, 168);
   --light-pink: rgba(255, 111, 168, 0.66);
@@ -31,8 +33,11 @@ html {
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text-color);
-  /* Move page gradient to body for simpler full-page background handling */
-  background: linear-gradient(90deg, var(--left) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
+  /* Use CSS variable for left background so JS can update it smoothly */
+  background: linear-gradient(90deg, var(--left-bg) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
+  overflow: hidden;
+  touch-action: none;
+  transition: background 0.3s ease;
 }
 
 ul {
@@ -65,36 +70,10 @@ svg {
 
 /* ensure positioned pseudo-elements and overlays are relative to page (добавили позиционирование для псевдоэлементов и оверлеев, таких как весы) */
 .page {
-  position: relative;
   flex-direction: column;
   width: 100%;
   height: 100vh;
   background: transparent;
-}
-
-/* Шаги по затемнению для женской стороны (увеличение номера класса через JS на элементе .page) */
-.page::before {
-  /* darkness overlay for female side; shown/adjusted via .page--female-dark-* classes */
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 1;
-  width: 44%;
-  pointer-events: none;
-}
-
-/* Apply darkness overlay by toggling a class on the top-level .page element */
-.page.page--female-dark-1::before {
-  background: linear-gradient(90deg, var(--light-pink) 0%, rgba(255, 111, 168, 0.66) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
-}
-
-.page.page--female-dark-2::before {
-  background: linear-gradient(90deg, var(--medium-pink) 0%, rgba(255, 111, 168, 0.88) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
-}
-
-.page.page--female-dark-3::before {
-  background: linear-gradient(90deg, var(--accent-pink) 0%, rgba(255, 111, 168, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
 }
 
 /* Scene layout and page background */
@@ -121,8 +100,8 @@ svg {
   top: 0;
   z-index: 5;
   /* place icons above the page overlay */
-  height: 100%;
   width: 25%;
+  height: 100%;
   pointer-events: none;
   opacity: 0.12;
   background-repeat: no-repeat;
@@ -135,6 +114,7 @@ svg {
   left: 0;
   background-image: url('../img/venus.svg');
   background-position: 20% 11%;
+  background-size: 100px 100px;
   filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgb(255, 111, 168));
 }
 
@@ -152,11 +132,13 @@ svg {
   position: relative;
   z-index: 6;
   width: 100%;
-  /* limit max width so layout stays predictable */
+  /* limit max width so layout stays predictable and keep a stable aspect */
   max-width: 680px;
-  height: 100%;
+  height: auto;
   /* center within flex container */
   margin: 0 auto;
+  /* aspect-ratio for responsive scaling */
+  aspect-ratio: 16 / 9;
 }
 
 /* Inline SVG controls */
@@ -199,7 +181,7 @@ svg {
   position: relative;
   /* aged silver base */
   color: rgba(150, 150, 155, 1);
-  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.12));
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.2));
 }
 
 .scales-svg g {
@@ -228,6 +210,7 @@ svg {
   /* avoid fixed bottom offset so the sheen scales with the SVG/container */
   /* lift main laptop above stacked items */
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.16) 20%, rgba(255, 255, 255, 0.06) 60%, rgba(255, 255, 255, 0) 100%);
+  /* mix-blend-mode to create subtle overlay effect */
   mix-blend-mode: overlay;
   transform: rotate(-10deg);
   filter: blur(5px);
@@ -269,6 +252,12 @@ svg {
   overflow: visible;
 }
 
+/* Упавшие элементы должны быть ниже основного ноутбука */
+.pan-target__item,
+.pan-target__item--landed {
+  z-index: 100;
+}
+
 .pan-target.pan-target--left {
   /* positioned as percentage of .scene-scales width */
   left: 18%;
@@ -283,12 +272,6 @@ svg {
   min-height: 50px;
 }
 
-/* Упавшие элементы должны быть ниже основного ноутбука */
-.pan-target__item,
-.pan-target__item--landed {
-  z-index: 100;
-}
-
 .pan-target.pan-target--right {
   /* positioned as percentage of .scene-scales width */
   left: 72%;
@@ -299,10 +282,10 @@ svg {
 .pan-target--left.pan-target__main {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  bottom: 12px;
   z-index: 60;
   width: 100%;
-  bottom: 12px;
+  transform: translateX(-50%);
 }
 
 .pan-target__main img {
@@ -310,37 +293,38 @@ svg {
   max-width: none;
   /* unify both laptops to initial width by default */
   height: auto;
-  transition: width 280ms ease;
+  transition: width 0.3s ease;
 }
 
 /* Ensure main laptop is above fallen items and ghosts */
 .pan-target__main {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  bottom: 12px;
   z-index: 200;
   pointer-events: none;
-  bottom: 12px;
+  transform: translateX(-50%);
 }
 
 /* Landed items should be positioned relative to the pan (stacked) */
 .pan-target__item--landed {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  /* bottom = 6px + index * 18px where index is provided by --stack-index */
-  bottom: calc(6px + (var(--stack-index, 0) * 18px));
+  left: calc(50% + var(--land-offset, 0px));
+  /* Используем переменную --item-rotation, fallback к старой --land-rot */
+  transform: translateX(-50%) rotate(var(--item-rotation, var(--land-rot, 0deg)));
+  /* bottom = 6px + index * 18px + optional curve/offset */
+  bottom: calc(6px + (var(--stack-index, 0) * 18px) + var(--land-curve, 0px));
 }
 
 /* landed items are smaller inside the pans */
 .pan-target__item--landed img {
   position: relative;
   left: 50%;
-  transform: translateX(-50%);
   z-index: 100;
   pointer-events: none;
   width: 36px;
   height: 36px;
+  transform: translateX(-50%);
 }
 
 /* Debug helper: toggle .debug on .pan-target while tuning positions */
@@ -355,17 +339,39 @@ svg {
   position: fixed;
   left: 0;
   top: 0;
+  /* below the main laptop which has higher z-index */
+  z-index: 40;
   width: 40px;
   height: 40px;
   transform: translate(var(--tx, 0px), var(--ty, 0px));
   opacity: 0;
-  transition: transform 700ms cubic-bezier(.22, .9, .35, 1), opacity 260ms ease-in;
-  z-index: 40;
-  /* below the main laptop which has higher z-index */
+  transition: transform 700ms cubic-bezier(.22, .9, .35, 1), opacity 0.3s ease-in;
+}
+
+/* Принудительно задаем цвет для всех элементов внутри чаш (если SVG через <img> — фильтр меняет цвет) */
+.pan-target__item img,
+.pan-target__main img {
+  filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
+}
+
+/* Для падающего призрака — чуть более выраженная тень */
+.falling-ghost {
+  filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 10px 8px rgba(0, 0, 0, 0.2));
 }
 
 .falling-ghost.land {
   opacity: 1;
+}
+
+/* Template variant of ghost: kept in DOM for preloading/measurement but hidden/offscreen */
+.falling-ghost.template {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0px;
+  height: 0px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Footer styles */

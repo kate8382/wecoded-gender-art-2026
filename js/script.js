@@ -83,14 +83,33 @@
       return (this.opts.defaultSequence || []).slice();
     }
 
+    // Вспомогательная функция: возвращает количество рядов для заданного числа элементов
+    _getRowCount(total, containerWidth) {
+      const itemW = this.opts.itemW;
+      const gap = this.opts.gap;
+      const maxCols = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
+      let remaining = total;
+      let maxCap = maxCols;
+      let rows = 0;
+      while (remaining > 0) {
+        const rowCount = Math.min(maxCap, remaining);
+        remaining -= rowCount;
+        maxCap = Math.max(1, maxCap - 1);
+        rows++;
+      }
+      return rows;
+    }
+
     // Метод, создающий плавающий элемент для анимации падения
     _ensureGhost() {
-      // keep a lightweight template ghost if needed; not used directly for concurrent drops
+      // keep a lightweight template ghost in the DOM for preloading/measurement
+      // mark it as a template and keep it visually hidden/offscreen.
       if (!this.ghost) {
         this.ghost = document.createElement('img');
-        this.ghost.className = 'falling-ghost';
+        this.ghost.className = 'falling-ghost template';
         this.ghost.alt = '';
         this.ghost.setAttribute('aria-hidden', 'true');
+        this.ghost.setAttribute('data-template', 'true');
         document.body.appendChild(this.ghost);
       }
     }
@@ -124,7 +143,7 @@
       const rowSpacing = this.opts.rowSpacing; // вертикальный шаг между рядами
       const baseBottom = this.opts.baseBottom; // базовый отступ от нижней кромки чаши
       // вычислим, сколько колонок реально помещается в ширину контейнера
-      const containerWidth = list.clientWidth || list.getBoundingClientRect().width || 180;
+      const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
       const maxBottomCapacity = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
 
       // строим ряды снизу вверх: сначала самая широкая нижняя строка (maxBottomCapacity),
@@ -152,13 +171,25 @@
         }
         const col = i - cum;
         const cols = rows[rowIndex];
+        // compute horizontal offset from center
         const offsetX = (col - (cols - 1) / 2) * (itemW + gap);
-        const bottom = baseBottom + rowIndex * rowSpacing;
+        // small row offset for the bottom row to imitate cup curvature (center items sit slightly lower)
+        let rowOffset = 0;
+        if (rowIndex === 0) {
+          const isCenter = col > 0 && col < cols - 1;
+          if (isCenter) rowOffset = -6; // push center items slightly lower
+        }
+        // random rotation to make items lie chaotically (-20..20deg)
+        const angle = Math.round((Math.random() * 40) - 20);
+
         const li = items[i];
-        li.style.position = 'absolute';
+        // set explicit left/bottom so layout doesn't drift (avoid diagonal stacking)
         li.style.left = `calc(50% + ${offsetX}px)`;
-        li.style.transform = 'translateX(-50%)';
+        const bottom = baseBottom + rowIndex * rowSpacing + rowOffset;
         li.style.bottom = `${bottom}px`;
+        // use CSS variables for rotation and keep stack-index for CSS rules if needed
+        li.style.setProperty('--item-rotation', `${angle}deg`);
+        li.style.setProperty('--stack-index', String(i - cum));
       }
     }
 
@@ -166,16 +197,21 @@
       if (!pan) return;
       const mainImg = pan.querySelector('.pan-target__main img');
       if (!mainImg) return;
+      // Only shrink the laptop on the left pan (female). Right pan stays at initial width.
+      const side = pan.dataset && pan.dataset.side;
+      const initial = this.opts.laptopInitialWidth;
+      if (side !== 'female') {
+        mainImg.style.width = initial + 'px';
+        return;
+      }
       const list = pan.querySelector('.pan-target__items');
       const count = list ? list.querySelectorAll('.pan-target__item').length : 0;
-      const initial = this.opts.laptopInitialWidth;
       const min = this.opts.laptopMinWidth;
       const maxCount = this.opts.laptopMaxCount;
       const diff = initial - min;
       const perItem = diff / maxCount;
       const newWidth = Math.max(min, Math.round(initial - count * perItem));
       mainImg.style.width = newWidth + 'px';
-      mainImg.style.zIndex = 200;
     }
 
     // Ensure the .pan-target__items container grows to accommodate stacked items
@@ -190,25 +226,12 @@
         return;
       }
 
-      const itemW = this.opts.itemW;
-      const gap = this.opts.gap;
       const rowSpacing = this.opts.rowSpacing;
       const baseBottom = this.opts.baseBottom;
       const itemH = this.opts.itemH;
 
-      const containerWidth = list.clientWidth || list.getBoundingClientRect().width || 180;
-      const maxCols = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
-
-      // compute rows like in _layoutPanItems
-      let remaining = total;
-      let maxCap = maxCols;
-      let rows = 0;
-      while (remaining > 0) {
-        const rowCount = Math.min(maxCap, remaining);
-        remaining -= rowCount;
-        maxCap = Math.max(1, maxCap - 1);
-        rows++;
-      }
+      const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
+      const rows = this._getRowCount(total, containerWidth);
 
       // required height: bottom offset of topmost row + item height + small padding
       const required = baseBottom + (rows - 1) * rowSpacing + itemH + 6;
@@ -231,9 +254,7 @@
       if (!list || !mainWrap) return;
 
       // ensure the wrapper is positioned (it should already be by CSS)
-      mainWrap.style.position = mainWrap.style.position || 'absolute';
-      // force high stacking for the wrapper
-      mainWrap.style.zIndex = 9999;
+      mainWrap.style.position = mainWrap.style.position;
 
       const items = Array.from(list.querySelectorAll('.pan-target__item'));
       const total = items.length;
@@ -247,20 +268,8 @@
       }
 
       // compute number of rows using the same algorithm as _layoutPanItems
-      const containerWidth = list.clientWidth || list.getBoundingClientRect().width || 180;
-      const itemW = this.opts.itemW;
-      const gap = this.opts.gap;
-      const maxCols = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
-
-      let remaining = total;
-      let maxCap = maxCols;
-      let rows = 0;
-      while (remaining > 0) {
-        const rowCount = Math.min(maxCap, remaining);
-        remaining -= rowCount;
-        maxCap = Math.max(1, maxCap - 1);
-        rows++;
-      }
+      const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
+      const rows = this._getRowCount(total, containerWidth);
 
       const topRowBottom = baseBottom + (rows - 1) * rowSpacing;
       // position wrapper so the main image visually rests on the pile; small negative overlap to look natural
@@ -269,8 +278,10 @@
       mainWrap.style.bottom = Math.max(baseBottom, targetBottom) + 'px';
     }
 
+    // Основной метод для анимации падения элемента в чашу; возвращает Promise, который резолвится после завершения анимации и добавления элемента в чашу
     drop(assetSrc, { side = 'female', size = null, offsetX = 0, offsetY = 0 } = {}) {
       return new Promise((resolve, reject) => {
+
         try {
           const pan = this._findPan(side);
           const target = this._computeTargetPosition(pan, { offsetX, offsetY });
@@ -323,39 +334,53 @@
             if (timeoutId) clearTimeout(timeoutId);
             ghost.removeEventListener('transitionend', onEnd);
 
-            const li = document.createElement('li');
-            li.className = 'pan-target__item pan-target__item--landed';
-            const img = document.createElement('img');
-            img.src = assetSrc;
-            img.alt = '';
-            // sizes are controlled by CSS variables; no need to set inline widths here
-            img.style.width = '';
-            img.style.height = '';
-            img.style.position = 'relative';
-            li.appendChild(img);
-            li.style.zIndex = '100';
+            // we'll create the landed <li> only for non-main items (handled in the branch below)
 
             if (isLaptop && main) {
-              main.innerHTML = '';
-              const mImg = document.createElement('img');
-              mImg.src = assetSrc;
-              mImg.alt = '';
-              mImg.className = 'pan-target__main-img';
-              // initial width comes from CSS variable; JS will adjust via _updateLaptopScaleForPan
-              // keep transition/zIndex but avoid duplicating size here
-              mImg.style.transition = 'width 260ms ease';
-              mImg.style.zIndex = 200;
-              main.appendChild(mImg);
-              // small per-side baseline tweak: left (female) slightly lower so it sits better on SVG curve
-              if (pan && pan.dataset && pan.dataset.side === 'female') {
-                main.style.bottom = '8px';
+              // avoid creating a duplicate main image when one already exists
+              const existing = main.querySelector('img');
+              if (existing && existing.src && existing.src.indexOf(assetSrc) !== -1) {
+                console.debug('Dropper: main image already present for', pan && pan.dataset && pan.dataset.side);
               } else {
-                main.style.bottom = '12px';
+                console.debug('Dropper: creating main image for', pan && pan.dataset && pan.dataset.side);
+                main.innerHTML = '';
+                const mImg = document.createElement('img');
+                mImg.src = assetSrc;
+                mImg.alt = '';
+                mImg.className = 'pan-target__main-img';
+                // initial width comes from CSS variable; JS will adjust via _updateLaptopScaleForPan
+                // keep transition/zIndex but avoid duplicating size here
+                mImg.style.transition = 'width 0.3s ease';
+                mImg.style.zIndex = 200;
+                main.appendChild(mImg);
+                // small per-side baseline tweak: left (female) slightly lower so it sits better on SVG curve
+                if (pan && pan.dataset && pan.dataset.side === 'female') {
+                  main.style.bottom = '8px';
+                } else {
+                  main.style.bottom = '12px';
+                }
+                pan.classList.add('has-main');
+                // remove the falling ghost for laptop drops as we created the persistent main image
+                requestAnimationFrame(() => {
+                  try { ghost.classList.remove('land'); } catch (e) { }
+                  try { ghost.remove(); } catch (e) { }
+                });
               }
-              pan.classList.add('has-main');
             } else if (list) {
+              const li = document.createElement('li');
+              li.className = 'pan-target__item pan-target__item--landed';
+              const img = document.createElement('img');
+              img.src = assetSrc;
+              img.alt = '';
+              img.width = this.opts.itemW;
+              img.height = this.opts.itemH;
+              li.appendChild(img);
+
               const idx = list.querySelectorAll('.pan-target__item').length;
               li.style.setProperty('--stack-index', String(idx));
+              // случайная ротация задаётся до добавления, чтобы CSS мог её применить сразу
+              const randomRotate = (Math.random() * 40 - 20); // -20..20deg
+              li.style.setProperty('--item-rotation', `${randomRotate}deg`);
               list.appendChild(li);
               try {
                 // restore JS pyramid layout (горка) and then update laptop scale
@@ -365,14 +390,25 @@
                 this._updatePanItemsContainerHeight(list, pan);
                 // adjust main laptop vertical position to rest on the pile
                 this._adjustMainForPile(pan);
+                // update only current pan after layout change
+                try { this._updateLaptopScaleForPan(pan); } catch (e) { }
               } catch (e) {
                 // ignore
               }
+              // allow browser to paint new layout before removing ghost to avoid flicker
+              requestAnimationFrame(() => {
+                ghost.classList.remove('land');
+                try { ghost.remove(); } catch (e) { }
+              });
+            } else {
+              // shouldn't happen, but ensure ghost removed
+              try { ghost.classList.remove('land'); } catch (e) { }
+              try { ghost.remove(); } catch (e) { }
             }
 
-            ghost.classList.remove('land');
-            ghost.remove();
-            const result = { pan, li };
+            // Build result object: li may be undefined for laptop drops
+            const result = { pan: pan };
+            if (typeof li !== 'undefined') result.li = li;
             if (opts.fallback) result.fallback = true;
             resolve(result);
           };
@@ -392,16 +428,56 @@
 
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения
     async runSequence(steps = []) {
+      // Progressive darkening: track fractional darkLevel from 0..1 and apply easing
+      if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
+      const maxSteps = Number(this.opts.laptopMaxCount) || 6;
+
+      // parse CSS color: supports #rgb, #rrggbb, rgb(r,g,b)
+      const parseColor = (str) => {
+        if (!str) return null;
+        str = str.trim();
+        if (str[0] === '#') {
+          const hex = str.slice(1);
+          if (hex.length === 3) {
+            return [
+              parseInt(hex[0] + hex[0], 16),
+              parseInt(hex[1] + hex[1], 16),
+              parseInt(hex[2] + hex[2], 16)
+            ];
+          }
+          if (hex.length === 6) {
+            return [
+              parseInt(hex.slice(0, 2), 16),
+              parseInt(hex.slice(2, 4), 16),
+              parseInt(hex.slice(4, 6), 16)
+            ];
+          }
+        }
+        const m = str.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+        if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+        return null;
+      };
+
+      // easing function: easeInOutCubic
+      const easeInOutCubic = (t) => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+
+      // read base left color from CSS var `--left` and set target accent
+      const css = getComputedStyle(document.documentElement);
+      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const target = [255, 111, 168]; // accent pink
+
       const applyDarken = (delta) => {
-        const pageEl = document.querySelector('.page');
-        if (!pageEl || !delta) return;
-        let current = 0;
-        if (pageEl.classList.contains('page--female-dark-1')) current = 1;
-        if (pageEl.classList.contains('page--female-dark-2')) current = 2;
-        if (pageEl.classList.contains('page--female-dark-3')) current = 3;
-        const next = Math.min(3, current + delta);
-        pageEl.classList.remove('page--female-dark-1', 'page--female-dark-2', 'page--female-dark-3');
-        if (next > 0) pageEl.classList.add(`page--female-dark-${next}`);
+        const step = Number(delta) || 0;
+        this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
+        const eased = easeInOutCubic(this.darkLevelFloat);
+        // mix baseLeft and target by eased factor
+        const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
+        const r = mix(baseLeft[0], target[0], eased);
+        const g = mix(baseLeft[1], target[1], eased);
+        const b = mix(baseLeft[2], target[2], eased);
+        document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
       };
 
       // определяем, является ли шаг падением ноутбука, для оптимизации соседних падений ноутбуков в разные чаши
@@ -435,6 +511,14 @@
         if (step.darken) applyDarken(Number(step.darken) || 1);
         await new Promise(r => setTimeout(r, step.delay ?? 600));
       }
+      // remove the falling ghost for laptop drops as we created the persistent main image
+      // ensure we let the browser paint the final state before removing
+      requestAnimationFrame(() => {
+        try {
+          ghost.classList.remove('land');
+        } catch (e) { }
+        try { ghost.remove(); } catch (e) { }
+      });
     }
   }
 
