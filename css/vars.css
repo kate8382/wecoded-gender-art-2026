@@ -1,0 +1,21 @@
+:root {
+  --right: #e8f4ff;
+  --left: #ffe6f3;
+  --left-bg: var(--left);
+  --darkness-opacity: 0;
+  --accent-blue: rgb(43, 124, 255);
+  --accent-pink: rgb(255, 111, 168);
+  --light-pink: rgba(255, 111, 168, 0.66);
+  --medium-pink: rgba(255, 111, 168, 0.88);
+  --text-color: #333;
+  /* pan / layout tuning exposed as CSS custom properties so JS can read them */
+  --pan-item-w: 36px;
+  --pan-item-h: 36px;
+  --pan-gap: 4px;
+  --pan-row-spacing: 22px;
+  --pan-base-bottom: 12px;
+  --pan-overlap: 2px;
+  --laptop-initial-width: 84px;
+  --laptop-min-width: 72px;
+  --laptop-max-count: 6;
+}

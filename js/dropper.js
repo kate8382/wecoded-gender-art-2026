@@ -1,3 +1,6 @@
+import { getRowCount, layoutPanItems, computeTargetPosition } from './layout.js';
+import { icons, defaultSequence } from './config.js';
+
 (function () {
   class Dropper {
     constructor(opts = {}) {
@@ -17,16 +20,7 @@
         // visual tuning
         overlap: 2,
         // default falling sequence (can be overridden via opts)
-        defaultSequence: [
-          { src: 'img/laptop.svg', side: 'female', darken: 0, delay: 400 },
-          { src: 'img/laptop.svg', side: 'male', darken: 0, delay: 600 },
-          { src: 'img/house.svg', side: 'female', darken: 1, delay: 700 },
-          { src: 'img/baby-carriage.svg', side: 'female', darken: 1, delay: 700 },
-          { src: 'img/cooking-pot.svg', side: 'female', darken: 1, delay: 700 },
-          { src: 'img/shopping-cart.svg', side: 'female', darken: 1, delay: 700 },
-          { src: 'img/wash-machine.svg', side: 'female', darken: 1, delay: 700 },
-          { src: 'img/ironing-2.svg', side: 'female', darken: 1, delay: 700 }
-        ],
+        defaultSequence: defaultSequence,
         // whether to auto-run default sequence when created (can be controlled externally)
         autoRun: true
       };
@@ -67,37 +61,17 @@
 
     // Метод, возвращающий список доступных иконок
     getIcons() {
-      return [
-        'img/laptop.svg',
-        'img/house.svg',
-        'img/baby-carriage.svg',
-        'img/cooking-pot.svg',
-        'img/shopping-cart.svg',
-        'img/wash-machine.svg',
-        'img/ironing-2.svg'
-      ];
+      return (this.opts.icons || icons || []).slice();
     }
 
     // Метод, возвращающий стандартную последовательность падений (можно переопределить через opts)
     getDefaultSequence() {
-      return (this.opts.defaultSequence || []).slice();
+      return (this.opts.defaultSequence || defaultSequence || []).slice();
     }
 
     // Вспомогательная функция: возвращает количество рядов для заданного числа элементов
     _getRowCount(total, containerWidth) {
-      const itemW = this.opts.itemW;
-      const gap = this.opts.gap;
-      const maxCols = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
-      let remaining = total;
-      let maxCap = maxCols;
-      let rows = 0;
-      while (remaining > 0) {
-        const rowCount = Math.min(maxCap, remaining);
-        remaining -= rowCount;
-        maxCap = Math.max(1, maxCap - 1);
-        rows++;
-      }
-      return rows;
+      return getRowCount(total, containerWidth, this.opts);
     }
 
     // Метод, создающий плавающий элемент для анимации падения
@@ -122,75 +96,12 @@
 
     // Метод, преобразующий координаты целевой панели в координаты для fixed ghost
     _computeTargetPosition(pan, offsets = {}) {
-      const panRect = pan.getBoundingClientRect();
-      // Центр панели как базовая точка
-      const cx = panRect.left + panRect.width / 2;
-      const cy = panRect.top + panRect.height / 2;
-      const offX = Number(offsets.offsetX ?? pan.dataset.offsetX ?? 0);
-      const offY = Number(offsets.offsetY ?? pan.dataset.offsetY ?? 0);
-      return { x: Math.round(cx + offX), y: Math.round(cy + offY) };
+      return computeTargetPosition(pan, offsets);
     }
 
     // Разметка (горка) для элементов внутри контейнера pan-target__items
     _layoutPanItems(list) {
-      if (!list) return;
-      const items = Array.from(list.querySelectorAll('.pan-target__item'));
-      const total = items.length;
-      if (!total) return;
-
-      const itemW = this.opts.itemW; // ширина маленького изображения внутри чаши
-      const gap = this.opts.gap; // горизонтальный промежуток
-      const rowSpacing = this.opts.rowSpacing; // вертикальный шаг между рядами
-      const baseBottom = this.opts.baseBottom; // базовый отступ от нижней кромки чаши
-      // вычислим, сколько колонок реально помещается в ширину контейнера
-      const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
-      const maxBottomCapacity = Math.max(1, Math.floor(containerWidth / (itemW + gap)));
-
-      // строим ряды снизу вверх: сначала самая широкая нижняя строка (maxBottomCapacity),
-      // затем немного уже (на 1) и т.д.
-      let remaining = total;
-      let maxCap = maxBottomCapacity;
-      const rows = [];
-      while (remaining > 0) {
-        const rowCount = Math.min(maxCap, remaining);
-        rows.push(rowCount);
-        remaining -= rowCount;
-        maxCap = Math.max(1, maxCap - 1);
-      }
-
-      // позиционируем каждый элемент по индексу, вычисляя его ряд и колонку
-      for (let i = 0; i < total; i++) {
-        let rowIndex = 0;
-        let cum = 0;
-        for (let r = 0; r < rows.length; r++) {
-          if (i < cum + rows[r]) {
-            rowIndex = r;
-            break;
-          }
-          cum += rows[r];
-        }
-        const col = i - cum;
-        const cols = rows[rowIndex];
-        // compute horizontal offset from center
-        const offsetX = (col - (cols - 1) / 2) * (itemW + gap);
-        // small row offset for the bottom row to imitate cup curvature (center items sit slightly lower)
-        let rowOffset = 0;
-        if (rowIndex === 0) {
-          const isCenter = col > 0 && col < cols - 1;
-          if (isCenter) rowOffset = -6; // push center items slightly lower
-        }
-        // random rotation to make items lie chaotically (-20..20deg)
-        const angle = Math.round((Math.random() * 40) - 20);
-
-        const li = items[i];
-        // set explicit left/bottom so layout doesn't drift (avoid diagonal stacking)
-        li.style.left = `calc(50% + ${offsetX}px)`;
-        const bottom = baseBottom + rowIndex * rowSpacing + rowOffset;
-        li.style.bottom = `${bottom}px`;
-        // use CSS variables for rotation and keep stack-index for CSS rules if needed
-        li.style.setProperty('--item-rotation', `${angle}deg`);
-        li.style.setProperty('--stack-index', String(i - cum));
-      }
+      return layoutPanItems(list, this.opts);
     }
 
     _updateLaptopScaleForPan(pan) {
@@ -363,7 +274,7 @@
                 // remove the falling ghost for laptop drops as we created the persistent main image
                 requestAnimationFrame(() => {
                   try { ghost.classList.remove('land'); } catch (e) { }
-                  try { ghost.remove(); } catch (e) { }
+                  requestAnimationFrame(() => { try { ghost.remove(); } catch (e) { } });
                 });
               }
             } else if (list) {
@@ -396,9 +307,12 @@
                 // ignore
               }
               // allow browser to paint new layout before removing ghost to avoid flicker
+              // make the landed item fade in, then remove ghost on next frame
+              try { li.style.opacity = '0'; } catch (e) { }
               requestAnimationFrame(() => {
+                try { li.style.transition = 'opacity 160ms ease'; li.style.opacity = '1'; } catch (e) { }
                 ghost.classList.remove('land');
-                try { ghost.remove(); } catch (e) { }
+                requestAnimationFrame(() => { try { ghost.remove(); } catch (e) { } });
               });
             } else {
               // shouldn't happen, but ensure ghost removed
@@ -432,46 +346,15 @@
       if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
 
-      // parse CSS color: supports #rgb, #rrggbb, rgb(r,g,b)
-      const parseColor = (str) => {
-        if (!str) return null;
-        str = str.trim();
-        if (str[0] === '#') {
-          const hex = str.slice(1);
-          if (hex.length === 3) {
-            return [
-              parseInt(hex[0] + hex[0], 16),
-              parseInt(hex[1] + hex[1], 16),
-              parseInt(hex[2] + hex[2], 16)
-            ];
-          }
-          if (hex.length === 6) {
-            return [
-              parseInt(hex.slice(0, 2), 16),
-              parseInt(hex.slice(2, 4), 16),
-              parseInt(hex.slice(4, 6), 16)
-            ];
-          }
-        }
-        const m = str.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-        if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
-        return null;
-      };
-
-      // easing function: easeInOutCubic
-      const easeInOutCubic = (t) => {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      };
-
       // read base left color from CSS var `--left` and set target accent
       const css = getComputedStyle(document.documentElement);
-      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
       const target = [255, 111, 168]; // accent pink
 
       const applyDarken = (delta) => {
         const step = Number(delta) || 0;
         this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
-        const eased = easeInOutCubic(this.darkLevelFloat);
+        const eased = this._ease(this.darkLevelFloat);
         // mix baseLeft and target by eased factor
         const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
         const r = mix(baseLeft[0], target[0], eased);
@@ -511,33 +394,122 @@
         if (step.darken) applyDarken(Number(step.darken) || 1);
         await new Promise(r => setTimeout(r, step.delay ?? 600));
       }
-      // remove the falling ghost for laptop drops as we created the persistent main image
-      // ensure we let the browser paint the final state before removing
-      requestAnimationFrame(() => {
-        try {
-          ghost.classList.remove('land');
-        } catch (e) { }
-        try { ghost.remove(); } catch (e) { }
+    }
+    // public helper: parse color strings (#rgb, #rrggbb, rgb(r,g,b))
+    parseColor(str) {
+      if (!str) return null;
+      str = String(str).trim();
+      if (str[0] === '#') {
+        const hex = str.slice(1);
+        if (hex.length === 3) {
+          return [
+            parseInt(hex[0] + hex[0], 16),
+            parseInt(hex[1] + hex[1], 16),
+            parseInt(hex[2] + hex[2], 16)
+          ];
+        }
+        if (hex.length === 6) {
+          return [
+            parseInt(hex.slice(0, 2), 16),
+            parseInt(hex.slice(2, 4), 16),
+            parseInt(hex.slice(4, 6), 16)
+          ];
+        }
+      }
+      const m = str.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+      if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+      return null;
+    }
+
+    // easing: easeInOutCubic
+    _ease(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    // Public: setDarkLevel(0..1) —  установить прогрессивное затемнение (обновляет --left-bg)
+    setDarkLevel(value) {
+      const maxSteps = Number(this.opts.laptopMaxCount) || 6;
+      this.darkLevelFloat = Math.min(1, Math.max(0, Number(value) || 0));
+      const eased = this._ease(this.darkLevelFloat);
+      const css = getComputedStyle(document.documentElement);
+      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const target = [255, 111, 168];
+      const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
+      const r = mix(baseLeft[0], target[0], eased);
+      const g = mix(baseLeft[1], target[1], eased);
+      const b = mix(baseLeft[2], target[2], eased);
+      document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
+    }
+
+    // Public: pulseAccent(strength) — триггер короткого пульса на левом акценте (0..1)
+    pulseAccent(strength = 1) {
+      const s = Math.min(1, Math.max(0, Number(strength) || 0));
+      document.documentElement.style.setProperty('--accent-pulse', String(s));
+      // small transient class to allow CSS transition/pulse
+      document.documentElement.classList.add('accent-pulse');
+      window.clearTimeout(this._accentPulseTimeout);
+      this._accentPulseTimeout = window.setTimeout(() => {
+        document.documentElement.classList.remove('accent-pulse');
+        document.documentElement.style.removeProperty('--accent-pulse');
+      }, 300 + Math.round(200 * s));
+    }
+
+    // Public: setBodyScale(scale) — набор CSS var для масштабирования тела (zoom/scale)
+    setBodyScale(scale = 1) {
+      const s = Math.max(0.5, Math.min(2, Number(scale) || 1));
+      document.documentElement.style.setProperty('--body-scale', String(s));
+      // apply transform to .page for visual zoom (CSS should use var)
+      const page = document.querySelector('.page');
+      if (page) page.style.transform = `scale(${s})`;
+    }
+
+    // Public: celebrate() — просто простой триггер конфетти (будет реализован позже)
+    celebrate() {
+      // For now, dispatch custom event so other modules (confetti) can listen
+      const ev = new CustomEvent('dropper:celebrate', { detail: { time: Date.now() } });
+      window.dispatchEvent(ev);
+    }
+
+    // Public: reset the pans and internal state so the scene can replay cleanly
+    reset() {
+      // remove non-template ghosts
+      const ghosts = Array.from(document.querySelectorAll('.falling-ghost')).filter(g => !g.hasAttribute('data-template'));
+      ghosts.forEach(g => { try { g.remove(); } catch (e) { } });
+
+      // clear items and mains from each pan
+      this.pans.forEach(pan => {
+        const list = pan.querySelector('.pan-target__items');
+        const main = pan.querySelector('.pan-target__main');
+        if (list) {
+          list.innerHTML = '';
+          list.style.height = '';
+          list.style.top = '';
+          list.style.bottom = '';
+        }
+        if (main) {
+          main.innerHTML = '';
+          pan.classList.remove('has-main');
+        }
+        // reset any inline bottom/width styles
+        const mainImg = pan.querySelector('.pan-target__main img');
+        if (mainImg) mainImg.style.width = this.opts.laptopInitialWidth + 'px';
+        pan.style.minHeight = '';
       });
+
+      // reset dark level and CSS var
+      this.darkLevelFloat = 0;
+      const css = getComputedStyle(document.documentElement);
+      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      document.documentElement.style.setProperty('--left-bg', `rgb(${baseLeft[0]}, ${baseLeft[1]}, ${baseLeft[2]})`);
     }
   }
 
   window.Dropper = Dropper;
+
 })();
 
-/* NOTE: Иконки и стандартная последовательность падений предоставляются как методы на экземплярах Dropper
-   Автоматический запуск стандартной последовательности при DOMContentLoaded, чтобы иконки падали без ручного вызова. */
+// expose class and avoid auto-run; main.js should instantiate and control playback
+export default Dropper;
 
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    const d = new Dropper();
-    // overlay is implemented via CSS on `.page::after`; no dynamic element needed
-    if (d.opts && d.opts.autoRun) {
-      const seq = d.getDefaultSequence();
-      // run in background (no await) — errors are caught
-      d.runSequence(seq).catch(err => console.warn('Dropper sequence error', err));
-    }
-  } catch (err) {
-    console.warn('Failed to auto-run Dropper sequence', err);
-  }
-});
+
+
