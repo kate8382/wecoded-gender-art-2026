@@ -342,6 +342,7 @@ import { icons, defaultSequence } from './config.js';
 
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения
     async runSequence(steps = []) {
+      console.log('DROPPER: runSequence called, steps=', steps && steps.length);
       // Progressive darkening: track fractional darkLevel from 0..1 and apply easing
       if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
@@ -394,6 +395,7 @@ import { icons, defaultSequence } from './config.js';
         if (step.darken) applyDarken(Number(step.darken) || 1);
         await new Promise(r => setTimeout(r, step.delay ?? 600));
       }
+      console.log('DROPPER: runSequence complete');
     }
     // public helper: parse color strings (#rgb, #rrggbb, rgb(r,g,b))
     parseColor(str) {
@@ -472,6 +474,7 @@ import { icons, defaultSequence } from './config.js';
 
     // Public: reset the pans and internal state so the scene can replay cleanly
     reset() {
+      console.log('DROPPER: reset called');
       // remove non-template ghosts
       const ghosts = Array.from(document.querySelectorAll('.falling-ghost')).filter(g => !g.hasAttribute('data-template'));
       ghosts.forEach(g => { try { g.remove(); } catch (e) { } });

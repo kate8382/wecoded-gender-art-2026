@@ -12,137 +12,178 @@ class MainApp {
 
     this._started = false;
     this._setupHandlers();
-    console.log('MainApp initialized — attempting autoplay (muted)');
-    this._attemptAutoplayMuted();
+    this._initStartOverlayHandlers();
+    console.log('MainApp initialized — waiting for user Start');
   }
 
   _setupHandlers() {
-    this.audio.addEventListener('play', () => this._onAudioPlay());
-    this.audio.addEventListener('ended', () => console.log('audio ended'));
-  }
-
-  async _attemptAutoplayMuted() {
-    try {
-      // try muted autoplay so visuals can begin without user interaction
-      this.audio.muted = true;
-      await this.audio.play();
-      console.log('autoplay (muted) succeeded');
-      // start visuals when audio actually begins
-      // note: audio is muted — user can later unmute via UI button
-      // run sequence but don't block
-      this._onAudioPlay();
-      // also create an unobtrusive play button so user may replay with sound
-      this._createPlayButton();
-    } catch (err) {
-      console.warn('autoplay failed, will wait for user to start', err && err.name, err && err.message);
-      // If autoplay fails due to background throttling (power saving) or because
-      // the document is not visible, try again when visibility/focus returns.
-      this._setupAutoplayRetry(err);
-      // fallback: create play button so user can start with sound manually
-      this._createPlayButton(true);
-    }
-  }
-
-  _setupAutoplayRetry(err) {
-    // If page was backgrounded or autoplay was blocked, attempt a muted play
-    // again when the page becomes visible or gains focus. Remove listeners
-    // after first attempt.
-    const tryPlayMuted = async () => {
-      try {
-        if (!document || document.visibilityState !== 'visible') return;
-        this.audio.muted = true;
-        await this.audio.play();
-        console.log('autoplay retry (muted) succeeded after visibility/focus change');
-        this._onAudioPlay();
-        // keep the play button for user-initiated unmuted replay
-        this._createPlayButton();
-        cleanup();
-      } catch (e) {
-        console.warn('autoplay retry failed', e && e.name, e && e.message);
-        // if still failing, leave handlers active until user interacts or tab stays visible
+    // use 'playing' to ensure audio has actually started (data is flowing)
+    this.audio.addEventListener('playing', () => { console.log('MAIN: audio playing event'); return this._onAudioPlay(); });
+    this.audio.addEventListener('play', () => { console.log('MAIN: audio play event, paused=', this.audio.paused); });
+    this.audio.addEventListener('pause', () => { console.log('MAIN: audio pause event'); });
+    this.audio.addEventListener('ended', () => {
+      console.log('audio ended');
+      // allow replay: mark not-started so _onAudioPlay will run sequence on next play
+      this._started = false;
+      // no autoplay flags — simple user-driven flow
+      // show THE END and restore overlay for replay
+      const theEnd = document.getElementById('theEnd');
+      const overlay = document.getElementById('startOverlay');
+      const page = document.querySelector('.page');
+      if (theEnd) { /* visibility controlled by _showOverlay(opts) */ }
+      if (overlay) {
+        // remove transparent state and show overlay with THE END
+        overlay.classList.remove('transparent');
+        this._showOverlay(overlay, { showEnd: true });
       }
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') tryPlayMuted();
-    };
-    const onFocus = () => tryPlayMuted();
-    const onPointer = () => tryPlayMuted();
-
-    const cleanup = () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('pointerdown', onPointer);
-    };
-
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('pointerdown', onPointer, { once: true });
+      console.log('MAIN: onended - overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
+      if (page) { page.classList.remove('scene-active'); page.style.background = 'transparent'; }
+      // clear scene visuals so next start behaves like fresh run
+      try { this.dropper.reset(); } catch (e) { console.warn('dropper.reset failed on ended', e); }
+      // ensure document body returns to initial background variable
+      try { document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--text-color') || 'var(--text-color)'; } catch (e) { }
+      try { this.dropper.celebrate(); } catch (e) { }
+    });
   }
+
+  _initStartOverlayHandlers() {
+    const overlay = document.getElementById('startOverlay');
+    const btn = document.getElementById('startButton');
+    const theEnd = document.getElementById('theEnd');
+    const page = document.querySelector('.page');
+    if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); }
+    if (overlay) { this._showOverlay(overlay); }
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      console.log('MAIN: start button clicked — before actions overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
+      try {
+        // prepare fresh scene before playback; reset first so _onAudioPlay can start sequence
+        try { this.dropper.reset(); } catch (e) { console.warn('reset failed', e); }
+        this.audio.muted = false;
+        this.audio.currentTime = 0;
+        // user-initiated start (no special flags required)
+        // hide THE END if present and show scene overlay immediately (UX like first-run)
+        try { if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); } } catch (e) { }
+        try { if (overlay) { this._hideOverlay(overlay); } } catch (e) { }
+        try { if (page) page.classList.add('scene-active'); } catch (e) { }
+        console.log('MAIN: after UI changes overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
+        // clear any inline body background set at end-screen so .page.scene-active is visible
+        try { document.body.style.background = ''; } catch (e) { }
+        await this.audio.play();
+        console.log('user-initiated start succeeded');
+        // If audio still paused after play (browser blocked unmute), show fallback play button
+        if (this.audio.paused) {
+          console.warn('audio.play() returned but audio is still paused — showing fallback play control');
+          this._createPlayButton(true, true);
+        }
+        // do not hide overlay here — wait until audio actually starts (handled in _onAudioPlay)
+        // NOTE: do not call runSequence() here — _onAudioPlay will run the sequence on 'play' event
+      } catch (err) {
+        console.warn('start button play failed', err);
+      }
+    });
+  }
+
+  // Helper: hide overlay with transition then set display:none as fallback
+  _hideOverlay(overlay) {
+    if (!overlay) return;
+    try {
+      overlay.classList.add('hidden');
+      // ensure 'removed' class after transition to fully remove from hit-testing
+      const done = () => {
+        try { overlay.classList.add('removed'); } catch (e) { }
+      };
+      // if transitionend doesn't fire (no transition), fallback after 250ms
+      let fired = false;
+      const onEnd = (e) => {
+        if (e && e.propertyName && e.propertyName.indexOf('opacity') === -1) return;
+        fired = true;
+        overlay.removeEventListener('transitionend', onEnd);
+        done();
+      };
+      overlay.addEventListener('transitionend', onEnd);
+      setTimeout(() => { if (!fired) done(); }, 260);
+    } catch (e) { console.warn('hideOverlay failed', e); }
+  }
+
+  // Helper: show overlay (restore display then remove hidden/behind)
+  _showOverlay(overlay, opts = {}) {
+    // opts.showEnd: whether to reveal THE END when showing overlay (default false)
+    if (!overlay) return;
+    try {
+      // remove 'removed' so overlay participates in layout, then force reflow
+      overlay.classList.remove('removed');
+      void overlay.offsetWidth;
+      overlay.classList.remove('hidden');
+      // ensure overlay children visibility according to options
+      try {
+        const theEnd = document.getElementById('theEnd');
+        if (theEnd) {
+          if (opts.showEnd) {
+            theEnd.hidden = false;
+            theEnd.removeAttribute('aria-hidden');
+            theEnd.classList.add('visible');
+            // force reflow and check computed opacity; if still 0 use inline fallback
+            void theEnd.offsetWidth;
+            const co = getComputedStyle(theEnd).opacity;
+            console.log('MAIN: _showOverlay theEnd post-toggle', { className: theEnd.className, hidden: theEnd.hidden, opacity: co });
+            if (co === '0') {
+              console.warn('MAIN: theEnd opacity remained 0 after adding .visible — applying inline fallback');
+              theEnd.style.opacity = '1';
+            }
+          } else {
+            theEnd.hidden = true;
+            theEnd.setAttribute('aria-hidden', 'true');
+            theEnd.classList.remove('visible');
+            theEnd.style.opacity = '';
+          }
+        }
+        const startBtn = document.getElementById('startButton');
+        if (startBtn) startBtn.style.display = '';
+      } catch (e) { }
+      // diagnostic
+      try {
+        const theEndEl = document.getElementById('theEnd');
+        const startBtn = document.getElementById('startButton');
+        const overlayStyles = getComputedStyle(overlay);
+        const theEndStyles = theEndEl ? getComputedStyle(theEndEl) : null;
+        const startBtnStyles = startBtn ? getComputedStyle(startBtn) : null;
+        const rect = overlay.getBoundingClientRect();
+        console.log('MAIN: _showOverlay computed', {
+          overlay: { display: overlayStyles.display, opacity: overlayStyles.opacity, visibility: overlayStyles.visibility, transform: overlayStyles.transform, rect },
+          theEnd: theEndEl ? { className: theEndEl.className, hidden: theEndEl.hidden, opacity: theEndStyles.opacity, display: theEndStyles.display, visibility: theEndStyles.visibility, transform: theEndStyles.transform, rect: theEndEl.getBoundingClientRect(), offsetHeight: theEndEl.offsetHeight } : '(no theEnd)',
+          startBtn: startBtn ? { display: startBtnStyles.display, opacity: startBtnStyles.opacity, visibility: startBtnStyles.visibility, rect: startBtn.getBoundingClientRect(), offsetHeight: startBtn.offsetHeight } : '(no startBtn)'
+        });
+      } catch (e) { console.warn('MAIN: _showOverlay computed failed', e); }
+    } catch (e) { console.warn('showOverlay failed', e); }
+  }
+
+  // Autoplay logic removed — playback is always started by explicit user action (Start button)
 
   _onAudioPlay() {
     if (this._started) return;
     this._started = true;
-    console.log('audio.play event fired — starting dropper sequence');
+    console.log('MAIN: audio.play event fired — starting dropper sequence', { _started: this._started });
+    // hide overlay and activate scene as soon as audio actually plays
+    try {
+      const overlay = document.getElementById('startOverlay');
+      const page = document.querySelector('.page');
+      const theEnd = document.getElementById('theEnd');
+      if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); }
+      // ensure backgrounds are transparent while scene runs
+      try { document.body.style.background = 'transparent'; } catch (e) { }
+      if (overlay) { overlay.classList.add('transparent'); this._hideOverlay(overlay); }
+      if (page) page.classList.add('scene-active');
+      console.log('MAIN: in _onAudioPlay overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
+    } catch (e) { }
     const seq = this.dropper.getDefaultSequence();
-    this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err));
+    this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)).then(() => console.log('DROPPER: runSequence finished'));
+    // no special user-interaction flags to clear
   }
 
-  _createPlayButton(showHint = false) {
-    if (this._playButton) return;
-    const btn = document.createElement('button');
-    btn.className = 'app-play-button';
-    btn.textContent = 'Play';
-    Object.assign(btn.style, {
-      position: 'fixed',
-      right: '18px',
-      bottom: '18px',
-      padding: '10px 14px',
-      borderRadius: '8px',
-      border: 'none',
-      background: 'rgba(0,0,0,0.6)',
-      color: 'white',
-      zIndex: 9999,
-      cursor: 'pointer',
-      fontSize: '14px'
-    });
-    btn.title = 'Play with sound';
-    btn.addEventListener('click', async () => {
-      try {
-        // unmute and restart from beginning so user hears sound from start
-        this.audio.muted = false;
-        this.audio.currentTime = 0;
-        await this.audio.play();
-        console.log('user-initiated play succeeded');
-        // reset scene so items don't accumulate from previous run
-        try { this.dropper.reset(); } catch (e) { console.warn('reset failed', e); }
-        // restart visuals sequence as a replay
-        try { this.dropper.runSequence(this.dropper.getDefaultSequence()); } catch (e) { console.warn('runSequence failed', e); }
-      } catch (err) {
-        console.warn('user play failed', err);
-      }
-    });
-
-    if (showHint) {
-      const hint = document.createElement('div');
-      hint.textContent = 'Click to play with sound';
-      Object.assign(hint.style, {
-        position: 'fixed',
-        right: '18px',
-        bottom: '62px',
-        zIndex: 9999,
-        color: '#fff',
-        background: 'rgba(0,0,0,0.4)',
-        padding: '6px 8px',
-        borderRadius: '6px',
-        fontSize: '12px'
-      });
-      document.body.appendChild(hint);
-      setTimeout(() => hint.remove(), 4000);
-    }
-
-    document.body.appendChild(btn);
-    this._playButton = btn;
+  _createPlayButton() {
+    // Floating play button intentionally disabled — central Start overlay is primary UI.
+    return null;
   }
 
   // public API helpers

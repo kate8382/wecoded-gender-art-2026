@@ -14,8 +14,8 @@ html {
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text-color);
-  /* Use CSS variable for left background so JS can update it smoothly */
-  background: linear-gradient(90deg, var(--left-bg) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
+  /* initial page background: start dark to force user gesture */
+  background: var(--text-color);
   overflow: hidden;
   touch-action: none;
   transition: background 0.3s ease;
@@ -32,6 +32,12 @@ svg {
   display: block;
   max-width: 100%;
   height: auto;
+}
+
+button {
+  border: none;
+  outline: none;
+  cursor: pointer;
 }
 
 .visually-hidden {
@@ -51,10 +57,28 @@ svg {
 
 /* ensure positioned pseudo-elements and overlays are relative to page (добавили позиционирование для псевдоэлементов и оверлеев, таких как весы) */
 .page {
+  position: relative;
   flex-direction: column;
   width: 100%;
   height: 100vh;
   background: transparent;
+  transition: background 0.3s ease, opacity 0.3s ease, transform 0.2s ease;
+}
+
+/* apply scene gradient only when page is active */
+.page.scene-active {
+  background: linear-gradient(90deg, var(--left-bg) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
+}
+
+/* hide scene visually until user starts (page gains .scene-active) */
+.page:not(.scene-active) .page__scene {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page.scene-active .page__scene {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Footer styles */
@@ -70,4 +94,112 @@ svg {
 .page__footer-note {
   margin: 0;
   font-size: 14px;
+}
+
+/* Start-Overlay */
+.start-overlay {
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  /* dark backdrop while overlay is visible */
+  background: var(--text-color);
+  pointer-events: auto;
+  /* transitions for hide/show via classes */
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.22s ease, visibility 0.22s ease, transform 0.22s ease;
+}
+
+/* prefer visibility/opacity toggle over display:none so transitions run smoothly;
+   use the `removed` class to fully remove from layout/hit-testing after transition */
+.start-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px);
+}
+
+/* fully remove overlay from layout and hit-testing when present */
+.start-overlay.removed {
+  display: none !important;
+}
+
+/* allow making overlay background transparent during playback */
+.start-overlay.transparent {
+  background: transparent;
+}
+
+.start-overlay>div {
+  text-align: center;
+}
+
+.start-button {
+  max-width: 120px;
+  height: 60px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--accent-pink) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--accent-blue) 100%);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  transition: transform 0.3s ease, filter 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.start-button__icon {
+  width: 36px;
+  height: 36px;
+  fill: var(--text-color);
+}
+
+.start-button:hover,
+.start-button:focus {
+  /* background: linear-gradient(90deg, var(--left) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%); */
+  transform: translateY(-4px);
+  filter: saturate(1.15);
+}
+
+/* entrance pop for start button */
+.start-button {
+  animation: popIn 0.34s cubic-bezier(.2, .9, .2, 1) both;
+}
+
+@keyframes popIn {
+  0% {
+    transform: translateY(6px) scale(0.98);
+    opacity: 0
+  }
+
+  60% {
+    transform: translateY(-2px) scale(1.02);
+    opacity: 1
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1
+  }
+}
+
+.the-end {
+  display: block;
+  margin: 18px 0 0 0;
+  font-size: 48px;
+  letter-spacing: 8px;
+  color: var(--accent-pink);
+  opacity: 0;
+  transform: translateY(8px) scale(.98);
+  transition: opacity 0.36s ease, transform .36s cubic-bezier(.2, .9, .2, 1);
+}
+
+.the-end.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Confetti container (hidden until celebration) */
+.confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10001;
+  overflow: visible;
 }
