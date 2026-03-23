@@ -56,6 +56,8 @@ import { icons, defaultSequence } from './config.js';
       }
       this.root = document.querySelector(this.opts.containerSelector) || document.body;
       this.pans = Array.from(document.querySelectorAll(this.opts.panSelector));
+      // scheduler map for externally scheduled drops (id -> timeout)
+      this._schedules = new Map();
       this._ensureGhost();
     }
 
@@ -328,7 +330,9 @@ import { icons, defaultSequence } from './config.js';
           };
 
           const onEnd = (e) => {
-            if (e.propertyName && e.propertyName.indexOf('transform') === -1) return;
+            // Срабатываем только для нашего ghost: это защищает от посторонних transitionend
+            if (e && e.target !== ghost) return;
+            // finalize будет защищён флагом finished, поэтому можно вызвать без проверки propertyName
             finalize({ fallback: false });
           };
 
@@ -338,6 +342,34 @@ import { icons, defaultSequence } from './config.js';
           reject(err);
         }
       });
+    }
+
+    // Планирование падения: delaySeconds (от текущего момента) и step-объект {src, side, size, offsetX, offsetY}
+    scheduleDrop(delaySeconds, step = {}) {
+      const id = Math.random().toString(36).slice(2, 9);
+      const ms = Math.max(0, Math.round(Number(delaySeconds) * 1000));
+      const to = setTimeout(() => {
+        try {
+          this.drop(step.src, { side: step.side, size: step.size, offsetX: step.offsetX, offsetY: step.offsetY }).catch(e => console.warn('scheduled drop failed', e));
+        } catch (e) { console.warn('scheduled drop invocation failed', e); }
+        this._schedules.delete(id);
+      }, ms);
+      this._schedules.set(id, to);
+      return id;
+    }
+
+    cancelSchedule(id) {
+      if (!this._schedules.has(id)) return false;
+      try { clearTimeout(this._schedules.get(id)); } catch (e) { }
+      this._schedules.delete(id);
+      return true;
+    }
+
+    clearSchedules() {
+      for (const [id, to] of this._schedules.entries()) {
+        try { clearTimeout(to); } catch (e) { }
+      }
+      this._schedules.clear();
     }
 
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения
@@ -459,10 +491,9 @@ import { icons, defaultSequence } from './config.js';
     // Public: setBodyScale(scale) — набор CSS var для масштабирования тела (zoom/scale)
     setBodyScale(scale = 1) {
       const s = Math.max(0.5, Math.min(2, Number(scale) || 1));
+      // Set CSS variable only; visual transform is applied to .page__scale in CSS.
+      try { console.log('Dropper: setBodyScale ->', s); } catch (e) { }
       document.documentElement.style.setProperty('--body-scale', String(s));
-      // apply transform to .page for visual zoom (CSS should use var)
-      const page = document.querySelector('.page');
-      if (page) page.style.transform = `scale(${s})`;
     }
 
     // Public: celebrate() — просто простой триггер конфетти (будет реализован позже)
@@ -475,6 +506,8 @@ import { icons, defaultSequence } from './config.js';
     // Public: reset the pans and internal state so the scene can replay cleanly
     reset() {
       console.log('DROPPER: reset called');
+      // очистить запланированные падения, если они есть
+      try { this.clearSchedules(); } catch (e) { }
       // remove non-template ghosts
       const ghosts = Array.from(document.querySelectorAll('.falling-ghost')).filter(g => !g.hasAttribute('data-template'));
       ghosts.forEach(g => { try { g.remove(); } catch (e) { } });

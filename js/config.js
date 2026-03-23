@@ -18,3 +18,13 @@ export const defaultSequence = [
   { src: 'img/wash-machine.svg', side: 'female', darken: 1, delay: 700 },
   { src: 'img/ironing-2.svg', side: 'female', darken: 1, delay: 700 }
 ];
+
+// по умолчанию zoom timeline для начального интро (используется MainApp/AudioDirector)
+export const zoomTimeline = {
+  // общая продолжительность фазы увеличения в секундах
+  duration: 2.5,
+  // дискретные шаги масштаба от маленького -> 1.0 (финальный)
+  scales: [0.20, 0.40, 0.60, 0.80, 1.0],
+  // если true — использовать плавную интерполяцию по audio.currentTime вместо дискретных шагов
+  continuous: true,
+};

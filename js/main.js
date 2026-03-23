@@ -1,99 +1,141 @@
 import Dropper from './dropper.js';
+import AudioDirector from './audioDirector.js';
+import { zoomTimeline } from './config.js';
 
 class MainApp {
   constructor(opts = {}) {
-    this.opts = Object.assign({ audioSrc: 'audio/james-brown-2.mp3' }, opts);
+    this.opts = Object.assign({ audioSrc: 'audio/james-brown-3.mp3' }, opts);
     this.dropper = new Dropper({ autoRun: false });
     window.dropper = this.dropper;
 
     this.audio = new Audio(this.opts.audioSrc);
     this.audio.preload = 'auto';
     window.__appAudio = this.audio;
+    // AudioDirector — отвечает за планирование вызовов по времени трека
+    this.audioDirector = new AudioDirector(this.audio);
+    window.__audioDirector = this.audioDirector;
+
+    // Кешируем часто используемые DOM-узлы на инстансе, чтобы избежать повторных querySelector
+    this.overlay = document.getElementById('startOverlay');
+    this.theEnd = document.getElementById('theEnd');
+    this.page = document.querySelector('.page');
+    this.startButton = document.getElementById('startButton');
 
     this._started = false;
     this._setupHandlers();
     this._initStartOverlayHandlers();
-    console.log('MainApp initialized — waiting for user Start');
+    // Установим начальный scale из конфигурации zoomTimeline, чтобы сцена не показывалась сразу в полном масштабе
+    try {
+      if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
+        const initial = Number(zoomTimeline.scales[0]) || 1;
+        try { console.log('MainApp: init body-scale ->', initial); } catch (e) { }
+        this.dropper.setBodyScale(initial);
+      }
+    } catch (e) { }
   }
 
   _setupHandlers() {
-    // use 'playing' to ensure audio has actually started (data is flowing)
-    this.audio.addEventListener('playing', () => { console.log('MAIN: audio playing event'); return this._onAudioPlay(); });
-    this.audio.addEventListener('play', () => { console.log('MAIN: audio play event, paused=', this.audio.paused); });
-    this.audio.addEventListener('pause', () => { console.log('MAIN: audio pause event'); });
+    // используем 'playing', чтобы убедиться, что аудио действительно началось (данные поступают)
+    this.audio.addEventListener('playing', () => { return this._onAudioPlay(); });
+    this.audio.addEventListener('play', () => { /* audio play event */ });
+    this.audio.addEventListener('pause', () => { /* audio pause event */ });
     this.audio.addEventListener('ended', () => {
-      console.log('audio ended');
-      // allow replay: mark not-started so _onAudioPlay will run sequence on next play
+      // Разрешить повторное воспроизведение: пометить как не начатое, чтобы _onAudioPlay запустил последовательность при следующем воспроизведении.
       this._started = false;
-      // no autoplay flags — simple user-driven flow
-      // show THE END and restore overlay for replay
-      const theEnd = document.getElementById('theEnd');
-      const overlay = document.getElementById('startOverlay');
-      const page = document.querySelector('.page');
-      if (theEnd) { /* visibility controlled by _showOverlay(opts) */ }
+      // Отсутствие флагов автовоспроизведения — простой пользовательский интерфейс.
+      // показать THE END и восстановить оверлей для повторного воспроизведения
+      const theEnd = this.theEnd;
+      const overlay = this.overlay;
+      const page = this.page;
+      if (theEnd) { /* visibility контролируется _showOverlay(opts) */ }
       if (overlay) {
-        // remove transparent state and show overlay with THE END
+        // Переключаем предсказуемый CSS-класс для финального экрана.
+        // Класс `final-visible` задаст все необходимые правила в CSS
+        // и имеет приоритет над обычными состояниями оверлея.
         overlay.classList.remove('transparent');
-        this._showOverlay(overlay, { showEnd: true });
+        overlay.classList.remove('hidden');
+        overlay.classList.remove('removed');
+        overlay.classList.add('final-visible');
+        // показать THE END явно (через класс .visible)
+        try {
+          if (theEnd) {
+            theEnd.hidden = false;
+            theEnd.removeAttribute('aria-hidden');
+            theEnd.classList.add('visible');
+          }
+        } catch (e) { }
       }
-      console.log('MAIN: onended - overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
-      if (page) { page.classList.remove('scene-active'); page.style.background = 'transparent'; }
-      // clear scene visuals so next start behaves like fresh run
+      // onended: overlay and page updated
+      if (page) { page.classList.remove('scene-active'); }
+      try { document.body.classList.remove('zooming'); } catch (e) { }
+      // очистить визуальные элементы сцены, чтобы следующий запуск вел себя как свежий
       try { this.dropper.reset(); } catch (e) { console.warn('dropper.reset failed on ended', e); }
-      // ensure document body returns to initial background variable
-      try { document.body.style.background = getComputedStyle(document.documentElement).getPropertyValue('--text-color') || 'var(--text-color)'; } catch (e) { }
       try { this.dropper.celebrate(); } catch (e) { }
     });
   }
 
+  // Инициализация обработчиков для стартового оверлея и кнопки, включая логи для диагностики и улучшенную обработку ошибок.
   _initStartOverlayHandlers() {
-    const overlay = document.getElementById('startOverlay');
-    const btn = document.getElementById('startButton');
-    const theEnd = document.getElementById('theEnd');
-    const page = document.querySelector('.page');
+    const overlay = this.overlay;
+    const btn = this.startButton;
+    const theEnd = this.theEnd;
+    const page = this.page;
     if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); }
     if (overlay) { this._showOverlay(overlay); }
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      console.log('MAIN: start button clicked — before actions overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
+      // start button clicked — before actions
       try {
-        // prepare fresh scene before playback; reset first so _onAudioPlay can start sequence
+        // подготовка свежей сцены перед воспроизведением; сначала сброс, чтобы _onAudioPlay мог запустить последовательность
         try { this.dropper.reset(); } catch (e) { console.warn('reset failed', e); }
         this.audio.muted = false;
         this.audio.currentTime = 0;
-        // user-initiated start (no special flags required)
-        // hide THE END if present and show scene overlay immediately (UX like first-run)
+        // пользовательский запуск (специальные флаги не требуются)
+        // скрыть THE END, если присутствует, и сразу показать оверлей сцены (UX как при первом запуске)
         try { if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); } } catch (e) { }
         try { if (overlay) { this._hideOverlay(overlay); } } catch (e) { }
         try { if (page) page.classList.add('scene-active'); } catch (e) { }
-        console.log('MAIN: after UI changes overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
-        // clear any inline body background set at end-screen so .page.scene-active is visible
-        try { document.body.style.background = ''; } catch (e) { }
+        // после изменений UI overlay/page
         await this.audio.play();
-        console.log('user-initiated start succeeded');
-        // If audio still paused after play (browser blocked unmute), show fallback play button
+        // user-initiated start succeeded
+        // если аудио всё ещё на паузе после play (браузер заблокировал unmute), показать fallback кнопку воспроизведения
         if (this.audio.paused) {
           console.warn('audio.play() returned but audio is still paused — showing fallback play control');
           this._createPlayButton(true, true);
         }
-        // do not hide overlay here — wait until audio actually starts (handled in _onAudioPlay)
-        // NOTE: do not call runSequence() here — _onAudioPlay will run the sequence on 'play' event
+        // не скрывать overlay здесь — ждать, пока аудио действительно не начнётся (обрабатывается в _onAudioPlay)
+        // ПРИМЕЧАНИЕ: не вызывать runSequence() здесь — _onAudioPlay запустит последовательность на событии 'play'
       } catch (err) {
         console.warn('start button play failed', err);
       }
     });
   }
 
-  // Helper: hide overlay with transition then set display:none as fallback
+  // Helper: скрыть overlay с переходом, затем установить display:none как запасной вариант
   _hideOverlay(overlay) {
     if (!overlay) return;
     try {
       overlay.classList.add('hidden');
-      // ensure 'removed' class after transition to fully remove from hit-testing
+      // hideOverlay: added hidden
+      // убедиться, что класс 'removed' добавлен после завершения перехода, чтобы полностью удалить из hit-testing
       const done = () => {
-        try { overlay.classList.add('removed'); } catch (e) { }
+        try {
+          overlay.classList.add('removed');
+          // убрать утилитный класс final-visible и очистить возможные inline-стили
+          overlay.classList.remove('final-visible');
+          overlay.style.opacity = '';
+          overlay.style.visibility = '';
+          overlay.style.display = '';
+          const theEnd = this.theEnd;
+          if (theEnd) {
+            theEnd.style.opacity = '';
+            theEnd.classList.remove('visible');
+            theEnd.hidden = true;
+            theEnd.setAttribute('aria-hidden', 'true');
+          }
+        } catch (e) { }
       };
-      // if transitionend doesn't fire (no transition), fallback after 250ms
+      // если событие transitionend не сработает (нет перехода), использовать запасной вариант через 250ms
       let fired = false;
       const onEnd = (e) => {
         if (e && e.propertyName && e.propertyName.indexOf('opacity') === -1) return;
@@ -106,30 +148,31 @@ class MainApp {
     } catch (e) { console.warn('hideOverlay failed', e); }
   }
 
-  // Helper: show overlay (restore display then remove hidden/behind)
+  // Helper: показать overlay (восстановить display, затем удалить hidden/behind)
   _showOverlay(overlay, opts = {}) {
-    // opts.showEnd: whether to reveal THE END when showing overlay (default false)
+    // opts.showEnd:  показывать ли THE END при отображении overlay (по умолчанию false)
     if (!overlay) return;
     try {
-      // remove 'removed' so overlay participates in layout, then force reflow
+      // удалить 'removed', чтобы overlay участвовал в layout, затем принудительно вызвать reflow
       overlay.classList.remove('removed');
       void overlay.offsetWidth;
       overlay.classList.remove('hidden');
-      // ensure overlay children visibility according to options
+
+      // убедиться, что дочерние элементы overlay видимы в соответствии с опциями
       try {
-        const theEnd = document.getElementById('theEnd');
+        const theEnd = this.theEnd;
         if (theEnd) {
           if (opts.showEnd) {
             theEnd.hidden = false;
             theEnd.removeAttribute('aria-hidden');
             theEnd.classList.add('visible');
-            // force reflow and check computed opacity; if still 0 use inline fallback
+            // принудительно вызвать reflow и проверить вычисленную непрозрачность; если всё ещё 0, использовать inline fallback
             void theEnd.offsetWidth;
             const co = getComputedStyle(theEnd).opacity;
-            console.log('MAIN: _showOverlay theEnd post-toggle', { className: theEnd.className, hidden: theEnd.hidden, opacity: co });
             if (co === '0') {
-              console.warn('MAIN: theEnd opacity remained 0 after adding .visible — applying inline fallback');
-              theEnd.style.opacity = '1';
+              console.warn('MAIN: theEnd opacity remained 0 after adding .visible — applying final-visible class fallback');
+              theEnd.style.opacity = '';
+              try { overlay.classList.add('final-visible'); } catch (e) { }
             }
           } else {
             theEnd.hidden = true;
@@ -138,57 +181,172 @@ class MainApp {
             theEnd.style.opacity = '';
           }
         }
-        const startBtn = document.getElementById('startButton');
+        const startBtn = this.startButton;
         if (startBtn) startBtn.style.display = '';
       } catch (e) { }
-      // diagnostic
+
+      // Если overlay остался невидимым по computed стилям — применим запасной класс
       try {
-        const theEndEl = document.getElementById('theEnd');
-        const startBtn = document.getElementById('startButton');
         const overlayStyles = getComputedStyle(overlay);
-        const theEndStyles = theEndEl ? getComputedStyle(theEndEl) : null;
-        const startBtnStyles = startBtn ? getComputedStyle(startBtn) : null;
-        const rect = overlay.getBoundingClientRect();
-        console.log('MAIN: _showOverlay computed', {
-          overlay: { display: overlayStyles.display, opacity: overlayStyles.opacity, visibility: overlayStyles.visibility, transform: overlayStyles.transform, rect },
-          theEnd: theEndEl ? { className: theEndEl.className, hidden: theEndEl.hidden, opacity: theEndStyles.opacity, display: theEndStyles.display, visibility: theEndStyles.visibility, transform: theEndStyles.transform, rect: theEndEl.getBoundingClientRect(), offsetHeight: theEndEl.offsetHeight } : '(no theEnd)',
-          startBtn: startBtn ? { display: startBtnStyles.display, opacity: startBtnStyles.opacity, visibility: startBtnStyles.visibility, rect: startBtn.getBoundingClientRect(), offsetHeight: startBtn.offsetHeight } : '(no startBtn)'
-        });
-      } catch (e) { console.warn('MAIN: _showOverlay computed failed', e); }
-    } catch (e) { console.warn('showOverlay failed', e); }
+        if (overlayStyles.display === 'none' || overlayStyles.visibility !== 'visible' || overlayStyles.opacity === '0') {
+          try { overlay.classList.add('final-visible'); } catch (e) { }
+        }
+      } catch (e) { }
+    } catch (e) { console.warn('MAIN: _showOverlay computed failed', e); }
   }
 
-  // Autoplay logic removed — playback is always started by explicit user action (Start button)
-
+  // аудиоплейбек всегда запускается явным действием пользователя (кнопка Start) — логика автозапуска удалена, так что нет необходимости в специальных флагах взаимодействия. Просто реагируем на событие 'playing' для запуска последовательности Dropper, гарантируя синхронизацию с фактическим началом воспроизведения аудио.
   _onAudioPlay() {
     if (this._started) return;
     this._started = true;
-    console.log('MAIN: audio.play event fired — starting dropper sequence', { _started: this._started });
-    // hide overlay and activate scene as soon as audio actually plays
+    try { console.log('MainApp: _onAudioPlay fired — clearing director and scheduling sequences'); } catch (e) { }
+    // очистим старые задачи директора перед планированием новых
+    try { this.audioDirector.clear(); } catch (e) { }
+    // пометить body как в режиме зума (фон будет применён через CSS .zooming)
+    try { document.body.classList.add('zooming'); } catch (e) { }
+    // audio.play event fired — starting dropper sequence
+    //  скрыть overlay и активировать сцену, как только аудио действительно начнет воспроизводиться
     try {
-      const overlay = document.getElementById('startOverlay');
-      const page = document.querySelector('.page');
-      const theEnd = document.getElementById('theEnd');
+      const overlay = this.overlay;
+      const page = this.page;
+      const theEnd = this.theEnd;
       if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); }
-      // ensure backgrounds are transparent while scene runs
-      try { document.body.style.background = 'transparent'; } catch (e) { }
       if (overlay) { overlay.classList.add('transparent'); this._hideOverlay(overlay); }
       if (page) page.classList.add('scene-active');
-      console.log('MAIN: in _onAudioPlay overlay.className=', overlay && overlay.className, 'page.className=', page && page.className);
+      // in _onAudioPlay: overlay/page state updated
     } catch (e) { }
     const seq = this.dropper.getDefaultSequence();
-    this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)).then(() => console.log('DROPPER: runSequence finished'));
-    // no special user-interaction flags to clear
-  }
-
-  _createPlayButton() {
-    // Floating play button intentionally disabled — central Start overlay is primary UI.
-    return null;
+    const zoomDuration = (zoomTimeline && Number(zoomTimeline.duration)) ? Number(zoomTimeline.duration) : (zoomTimeline ? 2.5 : 0);
+    /* Если в seq присутствуют элементы с полем `atTime` — используем AudioDirector для планирования точных вызовов. Иначе — fallback к существующему runSequence(delay-based). */
+    const hasAtTime = seq.some(s => typeof s.atTime === 'number');
+    if (hasAtTime) {
+      // очистим старые задачи и запланируем новые
+      try { console.log('MainApp: scheduling dropper steps via AudioDirector'); } catch (e) { }
+      seq.forEach(step => {
+        const t = Number(step.atTime);
+        if (!isNaN(t)) {
+          // если шаг попадает внутрь фазы зума — пропускаем его, чтобы падения не происходили во время зума
+          if (zoomDuration && t < zoomDuration) {
+            try { console.log('MainApp: skipping dropper step during zoom at', t, step); } catch (e) { }
+            return;
+          }
+          this.audioDirector.schedule(t, () => {
+            try { console.log('MainApp: dropper step firing at', t, step); } catch (e) { }
+            try { this.dropper.drop(step); } catch (e) { console.warn('dropper.drop failed from AudioDirector', e); }
+          });
+        }
+      });
+      // sequence scheduled via AudioDirector
+    } else {
+      // Если включён зум, отложим запуск runSequence до окончания фазы зума, чтобы падения не происходили во время неё
+      if (zoomTimeline && zoomTimeline.continuous) {
+        try { console.log('MainApp: deferring runSequence until continuous zoom completes'); } catch (e) { }
+        this._startContinuousZoom(zoomTimeline).then(() => {
+          try { this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); } catch (e) { }
+        }).catch((e) => { console.warn('continuous zoom promise rejected', e); this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); });
+      } else if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
+        // discrete zoom: schedule runSequence to start after zoom duration
+        try { console.log('MainApp: scheduling runSequence after discrete zoom end at', zoomDuration); } catch (e) { }
+        this.audioDirector.schedule(zoomDuration, () => {
+          try { this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); } catch (e) { }
+        });
+      } else {
+        this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err));
+      }
+    }
+    // если включен непрерывный зум в конфигурации, запускаем интерполяцию через RAF
+    try {
+      if (zoomTimeline && zoomTimeline.continuous) {
+        try { console.log('MainApp: starting continuous zoom (RAF)'); } catch (e) { }
+        this._startContinuousZoom(zoomTimeline);
+      } else if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
+        try { console.log('MainApp: scheduling zoom timeline via AudioDirector (discrete)'); } catch (e) { }
+        const scales = zoomTimeline.scales.slice(); // создать копию массива, чтобы избежать внешних мутаций
+        const total = Number(zoomTimeline.duration) || 2.5; // общая продолжительность фазы увеличения в секундах
+        const count = Math.max(1, scales.length); // количество дискретных шагов масштаба
+        // расписать каждый шаг масштаба на равные интервалы в течение общей продолжительности, с небольшим смещением для первого шага, если есть несколько шагов
+        scales.forEach((scale, idx) => {
+          const t = count === 1 ? 0 : (idx / (count - 1)) * total;
+          const isLast = idx === (scales.length - 1);
+          this.audioDirector.schedule(t, () => {
+            try { console.log('MainApp: zoom step at', t, '->', scale, 'isLast=', isLast); } catch (e) { }
+            try { this.dropper.setBodyScale(scale); } catch (e) { console.warn('setBodyScale failed', e); }
+            // на финальном шаге снимаем режим zooming, чтобы сцена могла развернуться на весь экран
+            if (isLast) {
+              try { document.body.classList.remove('zooming'); } catch (e) { }
+            }
+          });
+        });
+      }
+    } catch (e) { console.warn('zoom timeline scheduling failed', e); }
+    // нет специальных флагов взаимодействия с пользователем для очистки
   }
 
   // public API helpers
   get dropperInstance() { return this.dropper; }
   get audioElement() { return this.audio; }
+
+  // Continuous zoom: RAF loop that interpolates scales according to audio.currentTime
+  _startContinuousZoom(timeline) {
+    if (!timeline || !Array.isArray(timeline.scales) || !timeline.scales.length) return Promise.resolve();
+    this._stopContinuousZoom();
+    const scales = timeline.scales.slice();
+    const duration = Number(timeline.duration) || 2.5;
+    const n = Math.max(1, scales.length);
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    // Stepwise (snap) zoom: jumps between discrete scales in timeline.scales
+    return new Promise((resolve, reject) => {
+      let lastIndex = -1;
+      // небольшое опережение (в секундах), чтобы прыжки происходили чуть раньше аудио
+      const lead = Number(timeline.leadSeconds || timeline.lead) || 0.1;
+      // дополнительное опережение только для первого шага (по запросу) — дефолт 0.1
+      const leadFirst = Number(timeline.leadFirstSeconds || timeline.leadFirst) || 0.1;
+      try { console.log('MainApp: continuous snap zoom leadSeconds=', lead, 'leadFirstSeconds=', leadFirst); } catch (e) { }
+      const step = () => {
+        try {
+          const ct = (this.audio && typeof this.audio.currentTime === 'number') ? this.audio.currentTime : 0;
+          // apply extra lead only when still in the first bucket to make the first jump earlier
+          const firstBucketThreshold = duration / n;
+          const extraLead = (ct < firstBucketThreshold) ? leadFirst : 0;
+          const adjusted = Math.min(duration, Math.max(0, ct + lead + extraLead));
+          const pRaw = Math.max(0, Math.min(1, adjusted / duration));
+          // divide the 0..1 range into `n` buckets and snap to bucket index
+          let idx = Math.min(n - 1, Math.floor(pRaw * n));
+          if (pRaw >= 1) idx = n - 1;
+          if (idx !== lastIndex) {
+            lastIndex = idx;
+            const s = scales[idx];
+            try { this.dropper.setBodyScale(s); } catch (e) { }
+            try { console.log('MainApp: continuous snap zoom -> index', idx, 'scale', s); } catch (e) { }
+          }
+          if (ct >= duration) {
+            try { document.body.classList.remove('zooming'); } catch (e) { }
+            this._stopContinuousZoom();
+            resolve();
+            return;
+          }
+        } catch (e) { console.warn('continuous snap zoom step error', e); reject(e); return; }
+        this._zoomRafId = requestAnimationFrame(step);
+      };
+
+      // apply initial snap immediately
+      try {
+        const initScale = scales[0];
+        try { this.dropper.setBodyScale(initScale); } catch (e) { }
+        lastIndex = 0;
+      } catch (e) { }
+
+      this._zoomRafId = requestAnimationFrame(step);
+    });
+  }
+
+  _stopContinuousZoom() {
+    if (this._zoomRafId) {
+      try { cancelAnimationFrame(this._zoomRafId); } catch (e) { }
+      this._zoomRafId = null;
+    }
+  }
 }
 
 const app = new MainApp();
