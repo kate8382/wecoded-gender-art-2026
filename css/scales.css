@@ -283,6 +283,13 @@
   opacity: 1;
 }
 
+/* спиральная анимация теперь управляется через JS для плавных, параметризованных кривых.
+   Сохраняем минимальный класс-запасной вариант, чтобы старый CSS не мешал. */
+.falling-ghost.spiral {
+  transition: none;
+  /* JS будет устанавливать явные трансформации во время анимации */
+}
+
 /* Template variant of ghost: kept in DOM for preloading/measurement but hidden/offscreen */
 .falling-ghost.template {
   position: fixed;

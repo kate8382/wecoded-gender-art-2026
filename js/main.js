@@ -28,7 +28,7 @@ class MainApp {
     try {
       if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
         const initial = Number(zoomTimeline.scales[0]) || 1;
-        try { console.log('MainApp: init body-scale ->', initial); } catch (e) { }
+
         this.dropper.setBodyScale(initial);
       }
     } catch (e) { }
@@ -199,7 +199,7 @@ class MainApp {
   _onAudioPlay() {
     if (this._started) return;
     this._started = true;
-    try { console.log('MainApp: _onAudioPlay fired — clearing director and scheduling sequences'); } catch (e) { }
+
     // очистим старые задачи директора перед планированием новых
     try { this.audioDirector.clear(); } catch (e) { }
     // пометить body как в режиме зума (фон будет применён через CSS .zooming)
@@ -213,40 +213,45 @@ class MainApp {
       if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); }
       if (overlay) { overlay.classList.add('transparent'); this._hideOverlay(overlay); }
       if (page) page.classList.add('scene-active');
-      // in _onAudioPlay: overlay/page state updated
+      // в _onAudioPlay: состояние overlay/page обновлено
     } catch (e) { }
     const seq = this.dropper.getDefaultSequence();
-    const zoomDuration = (zoomTimeline && Number(zoomTimeline.duration)) ? Number(zoomTimeline.duration) : (zoomTimeline ? 2.5 : 0);
+    const zoomDuration = (zoomTimeline && typeof zoomTimeline.duration !== 'undefined') ? Number(zoomTimeline.duration) : 0;
     /* Если в seq присутствуют элементы с полем `atTime` — используем AudioDirector для планирования точных вызовов. Иначе — fallback к существующему runSequence(delay-based). */
     const hasAtTime = seq.some(s => typeof s.atTime === 'number');
+    let zoomStarted = false;
     if (hasAtTime) {
       // очистим старые задачи и запланируем новые
-      try { console.log('MainApp: scheduling dropper steps via AudioDirector'); } catch (e) { }
+
       seq.forEach(step => {
         const t = Number(step.atTime);
         if (!isNaN(t)) {
           // если шаг попадает внутрь фазы зума — пропускаем его, чтобы падения не происходили во время зума
           if (zoomDuration && t < zoomDuration) {
-            try { console.log('MainApp: skipping dropper step during zoom at', t, step); } catch (e) { }
             return;
           }
           this.audioDirector.schedule(t, () => {
-            try { console.log('MainApp: dropper step firing at', t, step); } catch (e) { }
             try { this.dropper.drop(step); } catch (e) { console.warn('dropper.drop failed from AudioDirector', e); }
           });
         }
       });
-      // sequence scheduled via AudioDirector
+      // последовательность запланирована через AudioDirector
     } else {
       // Если включён зум, отложим запуск runSequence до окончания фазы зума, чтобы падения не происходили во время неё
       if (zoomTimeline && zoomTimeline.continuous) {
-        try { console.log('MainApp: deferring runSequence until continuous zoom completes'); } catch (e) { }
-        this._startContinuousZoom(zoomTimeline).then(() => {
+
+        let runSeqStarted = false;
+        const startSeq = () => {
+          if (runSeqStarted) return; runSeqStarted = true;
           try { this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); } catch (e) { }
-        }).catch((e) => { console.warn('continuous zoom promise rejected', e); this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); });
+        };
+        const p = this._startContinuousZoom(zoomTimeline);
+        zoomStarted = true;
+        p.then(() => { try { startSeq(); } catch (e) { } }).catch((e) => { console.warn('continuous zoom promise rejected', e); startSeq(); });
+        // безопасный fallback: убедиться, что последовательность запускается после zoomDuration + 800ms, даже если промис никогда не разрешается
+        try { setTimeout(() => { try { startSeq(); } catch (e) { } }, Math.max(1000, (zoomDuration * 1000) + 800)); } catch (e) { }
       } else if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
-        // discrete zoom: schedule runSequence to start after zoom duration
-        try { console.log('MainApp: scheduling runSequence after discrete zoom end at', zoomDuration); } catch (e) { }
+        //  дискретный zoom: расписать runSequence на запуск после окончания фазы зума
         this.audioDirector.schedule(zoomDuration, () => {
           try { this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); } catch (e) { }
         });
@@ -256,20 +261,19 @@ class MainApp {
     }
     // если включен непрерывный зум в конфигурации, запускаем интерполяцию через RAF
     try {
-      if (zoomTimeline && zoomTimeline.continuous) {
-        try { console.log('MainApp: starting continuous zoom (RAF)'); } catch (e) { }
+      if (zoomTimeline && zoomTimeline.continuous && !zoomStarted) {
+        const total = (typeof zoomTimeline.duration !== 'undefined') ? Number(zoomTimeline.duration) : 0; // общая продолжительность фазы увеличения в секундах
         this._startContinuousZoom(zoomTimeline);
       } else if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
-        try { console.log('MainApp: scheduling zoom timeline via AudioDirector (discrete)'); } catch (e) { }
+
         const scales = zoomTimeline.scales.slice(); // создать копию массива, чтобы избежать внешних мутаций
-        const total = Number(zoomTimeline.duration) || 2.5; // общая продолжительность фазы увеличения в секундах
+        const total = (typeof zoomTimeline.duration !== 'undefined') ? Number(zoomTimeline.duration) : 0; // общая продолжительность фазы увеличения в секундах
         const count = Math.max(1, scales.length); // количество дискретных шагов масштаба
         // расписать каждый шаг масштаба на равные интервалы в течение общей продолжительности, с небольшим смещением для первого шага, если есть несколько шагов
         scales.forEach((scale, idx) => {
           const t = count === 1 ? 0 : (idx / (count - 1)) * total;
           const isLast = idx === (scales.length - 1);
           this.audioDirector.schedule(t, () => {
-            try { console.log('MainApp: zoom step at', t, '->', scale, 'isLast=', isLast); } catch (e) { }
             try { this.dropper.setBodyScale(scale); } catch (e) { console.warn('setBodyScale failed', e); }
             // на финальном шаге снимаем режим zooming, чтобы сцена могла развернуться на весь экран
             if (isLast) {
@@ -286,39 +290,38 @@ class MainApp {
   get dropperInstance() { return this.dropper; }
   get audioElement() { return this.audio; }
 
-  // Continuous zoom: RAF loop that interpolates scales according to audio.currentTime
+  //  Непрерывный зум: RAF loop, который интерполирует масштабы в соответствии с audio.currentTime
   _startContinuousZoom(timeline) {
     if (!timeline || !Array.isArray(timeline.scales) || !timeline.scales.length) return Promise.resolve();
     this._stopContinuousZoom();
     const scales = timeline.scales.slice();
-    const duration = Number(timeline.duration) || 2.5;
+    const duration = (typeof timeline.duration !== 'undefined') ? Number(timeline.duration) : 0;
     const n = Math.max(1, scales.length);
-    const lerp = (a, b, t) => a + (b - a) * t;
-
-    // Stepwise (snap) zoom: jumps between discrete scales in timeline.scales
+    //  Пошаговый (snap) зум: прыжки между дискретными масштабами в timeline.scales
     return new Promise((resolve, reject) => {
       let lastIndex = -1;
       // небольшое опережение (в секундах), чтобы прыжки происходили чуть раньше аудио
-      const lead = Number(timeline.leadSeconds || timeline.lead) || 0.1;
-      // дополнительное опережение только для первого шага (по запросу) — дефолт 0.1
-      const leadFirst = Number(timeline.leadFirstSeconds || timeline.leadFirst) || 0.1;
-      try { console.log('MainApp: continuous snap zoom leadSeconds=', lead, 'leadFirstSeconds=', leadFirst); } catch (e) { }
+      const lead = Number(timeline.leadSeconds || timeline.lead) || 0;
+      // дополнительное опережение только для первого шага (по запросу)
+      const leadFirst = Number(timeline.leadFirstSeconds || timeline.leadFirst) || 0;
+
       const step = () => {
         try {
           const ct = (this.audio && typeof this.audio.currentTime === 'number') ? this.audio.currentTime : 0;
-          // apply extra lead only when still in the first bucket to make the first jump earlier
+          // применить дополнительное опережение только когда все еще в первом бакете, чтобы сделать первый прыжок раньше
           const firstBucketThreshold = duration / n;
-          const extraLead = (ct < firstBucketThreshold) ? leadFirst : 0;
+          // учитывать уже добавленный lead при решении, нужен ли дополнительный leadFirst
+          const willBeInFirst = (ct + lead) < firstBucketThreshold;
+          const extraLead = willBeInFirst ? leadFirst : 0;
           const adjusted = Math.min(duration, Math.max(0, ct + lead + extraLead));
           const pRaw = Math.max(0, Math.min(1, adjusted / duration));
-          // divide the 0..1 range into `n` buckets and snap to bucket index
+          // разделить диапазон 0..1 на `n` бакетов и привязать к индексу бакета
           let idx = Math.min(n - 1, Math.floor(pRaw * n));
           if (pRaw >= 1) idx = n - 1;
           if (idx !== lastIndex) {
             lastIndex = idx;
             const s = scales[idx];
             try { this.dropper.setBodyScale(s); } catch (e) { }
-            try { console.log('MainApp: continuous snap zoom -> index', idx, 'scale', s); } catch (e) { }
           }
           if (ct >= duration) {
             try { document.body.classList.remove('zooming'); } catch (e) { }
@@ -330,13 +333,12 @@ class MainApp {
         this._zoomRafId = requestAnimationFrame(step);
       };
 
-      // apply initial snap immediately
+      // применить начальный прыжок сразу
       try {
         const initScale = scales[0];
         try { this.dropper.setBodyScale(initScale); } catch (e) { }
         lastIndex = 0;
       } catch (e) { }
-
       this._zoomRafId = requestAnimationFrame(step);
     });
   }

@@ -7,7 +7,7 @@ import { icons, defaultSequence } from './config.js';
       const defaults = {
         containerSelector: '.page',
         panSelector: '.pan-target',
-        // layout constants (used in multiple places)
+        // гибкие константы, используемые в нескольких местах
         itemW: 36,
         itemH: 36,
         gap: 4,
@@ -17,16 +17,16 @@ import { icons, defaultSequence } from './config.js';
         laptopInitialWidth: 84,
         laptopMinWidth: 72,
         laptopMaxCount: 6,
-        // visual tuning
+        // визуальная настройка
         overlap: 2,
-        // default falling sequence (can be overridden via opts)
+        // стандартная последовательность падений (может быть переопределена через opts)
         defaultSequence: defaultSequence,
-        // whether to auto-run default sequence when created (can be controlled externally)
+        // автоматически запускать стандартную последовательность при создании (может контролироваться извне)
         autoRun: true
       };
 
       this.opts = Object.assign({}, defaults, opts);
-      // Try to read overrides from CSS custom properties (defined on :root)
+      // Попытка прочитать переопределения из CSS-переменных (определены в :root)
       try {
         const css = getComputedStyle(document.documentElement);
         const readPx = (name) => {
@@ -52,12 +52,15 @@ import { icons, defaultSequence } from './config.js';
           if (typeof cssOverrides[k] !== 'undefined') this.opts[k] = cssOverrides[k];
         });
       } catch (e) {
-        // ignore if running in non-browser env
+        // игнорировать, если выполняется в среде без браузера
       }
+
       this.root = document.querySelector(this.opts.containerSelector) || document.body;
       this.pans = Array.from(document.querySelectorAll(this.opts.panSelector));
-      // scheduler map for externally scheduled drops (id -> timeout)
+      // карта планировщика для внешне запланированных падений (id -> timeout)
       this._schedules = new Map();
+      // разрешить временно приостанавливать падения, не связанные с ноутбуком (используется во время фокусированных тестов)
+      this._suspended = false;
       this._ensureGhost();
     }
 
@@ -78,8 +81,8 @@ import { icons, defaultSequence } from './config.js';
 
     // Метод, создающий плавающий элемент для анимации падения
     _ensureGhost() {
-      // keep a lightweight template ghost in the DOM for preloading/measurement
-      // mark it as a template and keep it visually hidden/offscreen.
+      // создать легковесный шаблонный элемент-призрак в DOM для предварительной загрузки/измерения
+      // отметить его как шаблон и держать визуально скрытым/вне экрана.
       if (!this.ghost) {
         this.ghost = document.createElement('img');
         this.ghost.className = 'falling-ghost template';
@@ -89,7 +92,6 @@ import { icons, defaultSequence } from './config.js';
         document.body.appendChild(this.ghost);
       }
     }
-
     // Метод, находящий pan-target по data-side (female/male) или возвращающий первый
     _findPan(side) {
       if (!side) return this.pans[0];
@@ -110,7 +112,7 @@ import { icons, defaultSequence } from './config.js';
       if (!pan) return;
       const mainImg = pan.querySelector('.pan-target__main img');
       if (!mainImg) return;
-      // Only shrink the laptop on the left pan (female). Right pan stays at initial width.
+      // только уменьшать ноутбук на левой панели (female). Правая панель остается с начальной шириной.
       const side = pan.dataset && pan.dataset.side;
       const initial = this.opts.laptopInitialWidth;
       if (side !== 'female') {
@@ -127,7 +129,7 @@ import { icons, defaultSequence } from './config.js';
       mainImg.style.width = newWidth + 'px';
     }
 
-    // Ensure the .pan-target__items container grows to accommodate stacked items
+    // Убедиться, что контейнер .pan-target__items растет, чтобы вместить сложенные элементы
     _updatePanItemsContainerHeight(list, pan) {
       if (!list) return;
       const items = Array.from(list.querySelectorAll('.pan-target__item'));
@@ -146,27 +148,27 @@ import { icons, defaultSequence } from './config.js';
       const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
       const rows = this._getRowCount(total, containerWidth);
 
-      // required height: bottom offset of topmost row + item height + small padding
+      // требуемая высота: смещение снизу верхнего ряда + высота элемента + небольшой отступ
       const required = baseBottom + (rows - 1) * rowSpacing + itemH + 6;
 
-      // set explicit height on the items container and anchor it to the bottom of pan
+      // установить явную высоту для контейнера элементов и закрепить его внизу панели
       list.style.height = required + 'px';
       list.style.top = 'auto';
       list.style.bottom = baseBottom + 'px';
-      // avoid changing pan size — allow items to overflow upward if necessary
+      // избежать изменения размера панели — позволить элементам выходить за пределы вверх при необходимости
       if (pan) {
         pan.style.minHeight = pan.style.minHeight || getComputedStyle(pan).minHeight;
       }
     }
 
-    // Adjust main laptop vertical position so it visually rests on top of the pile
+    // Настроить вертикальное положение основного ноутбука, чтобы он визуально располагался на вершине стопки
     _adjustMainForPile(pan) {
       if (!pan) return;
       const list = pan.querySelector('.pan-target__items');
       const mainWrap = pan.querySelector('.pan-target__main');
       if (!list || !mainWrap) return;
 
-      // ensure the wrapper is positioned (it should already be by CSS)
+      // убедиться, что обертка позиционирована (она уже должна быть по CSS)
       mainWrap.style.position = mainWrap.style.position;
 
       const items = Array.from(list.querySelectorAll('.pan-target__item'));
@@ -180,19 +182,19 @@ import { icons, defaultSequence } from './config.js';
         return;
       }
 
-      // compute number of rows using the same algorithm as _layoutPanItems
+      // вычислить количество рядов, используя тот же алгоритм, что и в _layoutPanItems
       const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
       const rows = this._getRowCount(total, containerWidth);
 
       const topRowBottom = baseBottom + (rows - 1) * rowSpacing;
-      // position wrapper so the main image visually rests on the pile; small negative overlap to look natural
+      // позиционировать обертку так, чтобы основной элемент визуально располагался на стопке; небольшой отрицательный перекрытие для естественного вида
       const overlap = this.opts.overlap; // сколько пикселей main должен перекрывать верхний ряд для лучшего визуального эффекта
       const targetBottom = topRowBottom + itemH - overlap;
       mainWrap.style.bottom = Math.max(baseBottom, targetBottom) + 'px';
     }
 
     // Основной метод для анимации падения элемента в чашу; возвращает Promise, который резолвится после завершения анимации и добавления элемента в чашу
-    drop(assetSrc, { side = 'female', size = null, offsetX = 0, offsetY = 0 } = {}) {
+    drop(assetSrc, { side = 'female', size = null, offsetX = 0, offsetY = 0, fallStyle = null, spiralDuration = null } = {}) {
       return new Promise((resolve, reject) => {
 
         try {
@@ -201,6 +203,13 @@ import { icons, defaultSequence } from './config.js';
           const main = pan.querySelector('.pan-target__main');
           const list = pan.querySelector('.pan-target__items');
           const isLaptop = typeof assetSrc === 'string' && assetSrc.toLowerCase().includes('laptop');
+          const isSpiral = isLaptop || fallStyle === 'spiral';
+
+          // Если падения приостановлены, пропустить не-спиральные/не-ноутбучные падения
+          if (this._suspended && !(isLaptop && (fallStyle === 'spiral' || fallStyle === 'force'))) {
+            resolve({ skipped: true });
+            return;
+          }
 
           // Создаём ghost для текущего падения
           const ghost = document.createElement('img');
@@ -226,15 +235,71 @@ import { icons, defaultSequence } from './config.js';
 
           ghost.style.left = startLeft + 'px';
           ghost.style.top = startTop + 'px';
+          // initialize CSS vars
           ghost.style.setProperty('--tx', `0px`);
           ghost.style.setProperty('--ty', `0px`);
           void ghost.offsetWidth;
 
-          requestAnimationFrame(() => {
-            ghost.style.setProperty('--tx', `${tx}px`);
-            ghost.style.setProperty('--ty', `${ty}px`);
-            ghost.classList.add('land');
-          });
+          // requestAnimationFrame(() => {
+          //   ghost.style.setProperty('--tx', `${tx}px`);
+          //   ghost.style.setProperty('--ty', `${ty}px`);
+          //   ghost.classList.add('land');
+          // });
+          let rafId = null;
+          if (isSpiral) {
+            // JS-driven спиральная анимация с использованием requestAnimationFrame
+            let durationMs = 4000;
+            if (typeof spiralDuration !== 'undefined' && spiralDuration !== null) {
+              if (typeof spiralDuration === 'number') durationMs = Number(spiralDuration) || durationMs;
+              else if (typeof spiralDuration === 'string') {
+                const s = spiralDuration.trim();
+                if (s.endsWith('ms')) durationMs = Number(s.replace('ms', '')) || durationMs;
+                else if (s.endsWith('s')) durationMs = (Number(s.replace('s', '')) || 4) * 1000;
+                else durationMs = Number(s) || durationMs;
+              }
+            }
+
+            // убедимся, что ghost видим
+            try { ghost.style.opacity = '1'; } catch (e) { }
+
+            const startLeftPx = startLeft;
+            const startTopPx = startTop;
+            const targetLeftPx = targetLeft;
+            const targetTopPx = targetTop;
+
+            const coils = 2.5; // меньше витков — компактнее
+            const thetaMax = Math.PI * 2 * coils; // макс. угол в радианах для заданного количества витков
+            // уменьшенные радиусы/рост для более плотной спирали
+            const startRadius = Math.max(4, Math.min(16, Math.round(ghostSize * 0.04)));
+            const growth = Math.max(4, Math.round(ghostSize * 0.09));
+
+            // анимация спирали с помощью requestAnimationFrame, которая обновляет позицию ghost на каждом кадре, комбинируя линейное движение к цели с круговым движением для создания спирального эффекта
+            const t0 = performance.now();
+            const step = (now) => {
+              const elapsed = now - t0;
+              const p = Math.min(1, elapsed / durationMs);
+              const theta = p * thetaMax;
+              const r = startRadius + growth * theta;
+              // envelope: смещение стремится к 0 при p=0 и p=1 — предотвращает превышение цели и прыжки
+              const envelope = Math.sin(p * Math.PI);
+              const sx = envelope * r * Math.cos(theta);
+              const sy = envelope * r * Math.sin(theta);
+              const lx = (targetLeftPx - startLeftPx) * p;
+              const ly = (targetTopPx - startTopPx) * p;
+              const x = Math.round(lx + sx);
+              const y = Math.round(ly + sy);
+              ghost.style.transform = `translate(${x}px, ${y}px)`;
+              if (p < 1) rafId = requestAnimationFrame(step);
+              else finalize();
+            };
+            rafId = requestAnimationFrame(step);
+          } else {
+            requestAnimationFrame(() => {
+              ghost.style.setProperty('--tx', `${tx}px`);
+              ghost.style.setProperty('--ty', `${ty}px`);
+              ghost.classList.add('land');
+            });
+          }
 
           // обработчик завершения анимации (или таймаут для надёжности), который создаёт финальный элемент в чаше и удаляет ghost
           let finished = false;
@@ -245,12 +310,15 @@ import { icons, defaultSequence } from './config.js';
             if (finished) return;
             finished = true;
             if (timeoutId) clearTimeout(timeoutId);
+            // cancel any RAF-driven spiral
+            try { if (typeof rafId !== 'undefined' && rafId) cancelAnimationFrame(rafId); } catch (e) { }
             ghost.removeEventListener('transitionend', onEnd);
+            ghost.removeEventListener('animationend', onEnd);
 
-            // we'll create the landed <li> only for non-main items (handled in the branch below)
+            // создадим элемент <li> только для неосновных элементов (обрабатывается в ветке ниже)
 
             if (isLaptop && main) {
-              // avoid creating a duplicate main image when one already exists
+              // избежать создания дублирующего основного изображения, когда оно уже существует
               const existing = main.querySelector('img');
               if (existing && existing.src && existing.src.indexOf(assetSrc) !== -1) {
                 console.debug('Dropper: main image already present for', pan && pan.dataset && pan.dataset.side);
@@ -261,19 +329,19 @@ import { icons, defaultSequence } from './config.js';
                 mImg.src = assetSrc;
                 mImg.alt = '';
                 mImg.className = 'pan-target__main-img';
-                // initial width comes from CSS variable; JS will adjust via _updateLaptopScaleForPan
-                // keep transition/zIndex but avoid duplicating size here
+                // инициальная ширина берется из CSS-переменной; JS будет корректировать через _updateLaptopScaleForPan
+                // сохранить переход/zIndex, но избежать дублирования размера здесь
                 mImg.style.transition = 'width 0.3s ease';
                 mImg.style.zIndex = 200;
                 main.appendChild(mImg);
-                // small per-side baseline tweak: left (female) slightly lower so it sits better on SVG curve
+                // небольшая корректировка базовой линии для каждой стороны: левая (женская) немного ниже, чтобы лучше сидела на кривой SVG
                 if (pan && pan.dataset && pan.dataset.side === 'female') {
                   main.style.bottom = '8px';
                 } else {
                   main.style.bottom = '12px';
                 }
                 pan.classList.add('has-main');
-                // remove the falling ghost for laptop drops as we created the persistent main image
+                // удалить падающий ghost для ноутбучных падений, так как мы создали постоянное основное изображение
                 requestAnimationFrame(() => {
                   try { ghost.classList.remove('land'); } catch (e) { }
                   requestAnimationFrame(() => { try { ghost.remove(); } catch (e) { } });
@@ -296,20 +364,20 @@ import { icons, defaultSequence } from './config.js';
               li.style.setProperty('--item-rotation', `${randomRotate}deg`);
               list.appendChild(li);
               try {
-                // restore JS pyramid layout (горка) and then update laptop scale
+                // восстановить JS-пирамидальную раскладку (горка), а затем обновить масштаб ноутбука
                 this._layoutPanItems(list);
                 this._updateLaptopScaleForPan(pan);
-                // ensure the items container grows so stacked items don't overflow visually
+                // обеспечить рост контейнера элементов, чтобы сложенные элементы не выходили за пределы визуально
                 this._updatePanItemsContainerHeight(list, pan);
-                // adjust main laptop vertical position to rest on the pile
+                // скорректировать вертикальное положение основного ноутбука, чтобы он опирался на стопку
                 this._adjustMainForPile(pan);
-                // update only current pan after layout change
+                // обновить только текущий пан после изменения раскладки
                 try { this._updateLaptopScaleForPan(pan); } catch (e) { }
               } catch (e) {
                 // ignore
               }
-              // allow browser to paint new layout before removing ghost to avoid flicker
-              // make the landed item fade in, then remove ghost on next frame
+              // позволить браузеру отрисовать новую раскладку перед удалением ghost, чтобы избежать мерцания
+              // сделать так, чтобы приземлившийся элемент плавно появлялся, затем удалить ghost на следующем кадре
               try { li.style.opacity = '0'; } catch (e) { }
               requestAnimationFrame(() => {
                 try { li.style.transition = 'opacity 160ms ease'; li.style.opacity = '1'; } catch (e) { }
@@ -317,12 +385,12 @@ import { icons, defaultSequence } from './config.js';
                 requestAnimationFrame(() => { try { ghost.remove(); } catch (e) { } });
               });
             } else {
-              // shouldn't happen, but ensure ghost removed
+              // не должно происходить, но убедимся, что ghost удален
               try { ghost.classList.remove('land'); } catch (e) { }
               try { ghost.remove(); } catch (e) { }
             }
 
-            // Build result object: li may be undefined for laptop drops
+            // построить объект результата: li может быть неопределён для падений ноутбуков
             const result = { pan: pan };
             if (typeof li !== 'undefined') result.li = li;
             if (opts.fallback) result.fallback = true;
@@ -336,8 +404,28 @@ import { icons, defaultSequence } from './config.js';
             finalize({ fallback: false });
           };
 
-          ghost.addEventListener('transitionend', onEnd);
-          timeoutId = setTimeout(() => finalize({ fallback: true }), 1400);
+          if (!isSpiral) {
+            ghost.addEventListener('transitionend', onEnd);
+            ghost.addEventListener('animationend', onEnd);
+          }
+          //  безопасный таймаут: разрешить полную продолжительность спирали (плюс небольшой буфер), когда используется анимация спирали
+          const defaultFallback = 1400;
+          let safeTimeout = defaultFallback;
+          if (isSpiral) {
+            // derive ms from spiralDuration arg if present, fallback 4000ms
+            let ms = 4000;
+            if (typeof spiralDuration !== 'undefined' && spiralDuration !== null) {
+              if (typeof spiralDuration === 'number') ms = Number(spiralDuration) || ms;
+              else if (typeof spiralDuration === 'string') {
+                const s = spiralDuration.trim();
+                if (s.endsWith('ms')) ms = Number(s.replace('ms', '')) || ms;
+                else if (s.endsWith('s')) ms = (Number(s.replace('s', '')) || 4) * 1000;
+                else ms = Number(s) || ms;
+              }
+            }
+            safeTimeout = Math.max(defaultFallback, ms + 300);
+          }
+          timeoutId = setTimeout(() => finalize({ fallback: true }), safeTimeout);
         } catch (err) {
           reject(err);
         }
@@ -374,12 +462,11 @@ import { icons, defaultSequence } from './config.js';
 
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения
     async runSequence(steps = []) {
-      console.log('DROPPER: runSequence called, steps=', steps && steps.length);
-      // Progressive darkening: track fractional darkLevel from 0..1 and apply easing
+      // постепенное затемнение: отслеживаем дробный уровень затемнения от 0 до 1 и применяем easing
       if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
 
-      // read base left color from CSS var `--left` and set target accent
+      // читаем базовый левый цвет из CSS-переменной `--left` и устанавливаем целевой акцент
       const css = getComputedStyle(document.documentElement);
       const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
       const target = [255, 111, 168]; // accent pink
@@ -388,7 +475,7 @@ import { icons, defaultSequence } from './config.js';
         const step = Number(delta) || 0;
         this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
         const eased = this._ease(this.darkLevelFloat);
-        // mix baseLeft and target by eased factor
+        // смешиваем baseLeft и target по фактору eased
         const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
         const r = mix(baseLeft[0], target[0], eased);
         const g = mix(baseLeft[1], target[1], eased);
@@ -427,9 +514,12 @@ import { icons, defaultSequence } from './config.js';
         if (step.darken) applyDarken(Number(step.darken) || 1);
         await new Promise(r => setTimeout(r, step.delay ?? 600));
       }
-      console.log('DROPPER: runSequence complete');
+
     }
-    // public helper: parse color strings (#rgb, #rrggbb, rgb(r,g,b))
+    // Приостановка/возобновление падений не-ноутбуков (полезно для сфокусированного тестирования)
+    suspendDrops() { this._suspended = true; }
+    resumeDrops() { this._suspended = false; }
+    // public helper: парсинг цветовых строк (#rgb, #rrggbb, rgb(r,g,b))
     parseColor(str) {
       if (!str) return null;
       str = String(str).trim();
@@ -492,27 +582,25 @@ import { icons, defaultSequence } from './config.js';
     setBodyScale(scale = 1) {
       const s = Math.max(0.5, Math.min(2, Number(scale) || 1));
       // Set CSS variable only; visual transform is applied to .page__scale in CSS.
-      try { console.log('Dropper: setBodyScale ->', s); } catch (e) { }
       document.documentElement.style.setProperty('--body-scale', String(s));
     }
 
     // Public: celebrate() — просто простой триггер конфетти (будет реализован позже)
     celebrate() {
-      // For now, dispatch custom event so other modules (confetti) can listen
+      //  Пока что отправляем пользовательское событие, чтобы другие модули (конфетти) могли его слушать
       const ev = new CustomEvent('dropper:celebrate', { detail: { time: Date.now() } });
       window.dispatchEvent(ev);
     }
 
-    // Public: reset the pans and internal state so the scene can replay cleanly
+    // Public: сбросить панели и внутреннее состояние, чтобы сцена могла воспроизводиться чисто
     reset() {
-      console.log('DROPPER: reset called');
       // очистить запланированные падения, если они есть
       try { this.clearSchedules(); } catch (e) { }
-      // remove non-template ghosts
+      // удалить не-шаблонные призраки
       const ghosts = Array.from(document.querySelectorAll('.falling-ghost')).filter(g => !g.hasAttribute('data-template'));
       ghosts.forEach(g => { try { g.remove(); } catch (e) { } });
 
-      // clear items and mains from each pan
+      //  очистить элементы и основные блоки из каждой панели
       this.pans.forEach(pan => {
         const list = pan.querySelector('.pan-target__items');
         const main = pan.querySelector('.pan-target__main');
@@ -526,13 +614,13 @@ import { icons, defaultSequence } from './config.js';
           main.innerHTML = '';
           pan.classList.remove('has-main');
         }
-        // reset any inline bottom/width styles
+        //  сбросить любые встроенные стили bottom/width
         const mainImg = pan.querySelector('.pan-target__main img');
         if (mainImg) mainImg.style.width = this.opts.laptopInitialWidth + 'px';
         pan.style.minHeight = '';
       });
 
-      // reset dark level and CSS var
+      //  сбросить уровень затемнения и CSS-переменную
       this.darkLevelFloat = 0;
       const css = getComputedStyle(document.documentElement);
       const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
@@ -544,7 +632,7 @@ import { icons, defaultSequence } from './config.js';
 
 })();
 
-// expose class and avoid auto-run; main.js should instantiate and control playback
+//  экспортируем класс и избегаем автоматического запуска; main.js должен создавать экземпляр и управлять воспроизведением
 export default Dropper;
 
 
