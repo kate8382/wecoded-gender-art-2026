@@ -37,7 +37,8 @@ class MainApp {
   _setupHandlers() {
     // используем 'playing', чтобы убедиться, что аудио действительно началось (данные поступают)
     this.audio.addEventListener('playing', () => { return this._onAudioPlay(); });
-    this.audio.addEventListener('play', () => { /* audio play event */ });
+    // также реагируем на 'play', чтобы запускать зум как можно раньше при пользовательском воспроизведении
+    this.audio.addEventListener('play', () => { return this._onAudioPlay(); });
     this.audio.addEventListener('pause', () => { /* audio pause event */ });
     this.audio.addEventListener('ended', () => {
       // Разрешить повторное воспроизведение: пометить как не начатое, чтобы _onAudioPlay запустил последовательность при следующем воспроизведении.
@@ -202,6 +203,8 @@ class MainApp {
 
     // очистим старые задачи директора перед планированием новых
     try { this.audioDirector.clear(); } catch (e) { }
+    // регистрируем расписание паузы и падений в Dropper (через AudioDirector)
+    try { this.dropper.scheduleLeftBowlSequence(this.audioDirector); } catch (e) { console.warn('scheduleLeftBowlSequence failed', e); }
     // пометить body как в режиме зума (фон будет применён через CSS .zooming)
     try { document.body.classList.add('zooming'); } catch (e) { }
     // audio.play event fired — starting dropper sequence
@@ -215,7 +218,14 @@ class MainApp {
       if (page) page.classList.add('scene-active');
       // в _onAudioPlay: состояние overlay/page обновлено
     } catch (e) { }
-    const seq = this.dropper.getDefaultSequence();
+    let seq = this.dropper.getDefaultSequence();
+    // если Dropper запланировал последовательность для левой чаши, исключаем эти элементы из стандартной последовательности
+    try {
+      const scheduled = this.dropper._leftBowlSequenceItems;
+      if (Array.isArray(scheduled) && scheduled.length) {
+        seq = seq.filter(s => !(s && typeof s.src === 'string' && scheduled.includes(s.src)));
+      }
+    } catch (e) { }
     const zoomDuration = (zoomTimeline && typeof zoomTimeline.duration !== 'undefined') ? Number(zoomTimeline.duration) : 0;
     /* Если в seq присутствуют элементы с полем `atTime` — используем AudioDirector для планирования точных вызовов. Иначе — fallback к существующему runSequence(delay-based). */
     const hasAtTime = seq.some(s => typeof s.atTime === 'number');
@@ -285,6 +295,8 @@ class MainApp {
     } catch (e) { console.warn('zoom timeline scheduling failed', e); }
     // нет специальных флагов взаимодействия с пользователем для очистки
   }
+
+
 
   // public API helpers
   get dropperInstance() { return this.dropper; }

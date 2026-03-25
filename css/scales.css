@@ -35,7 +35,15 @@
   background-image: url('../img/venus.svg');
   background-position: 20% 11%;
   background-size: 100px 100px;
-  filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgb(255, 111, 168));
+  /* Allow JS-driven pulsing via --accent-pulse (0..1) */
+  transform-origin: center center;
+  will-change: transform, filter, opacity;
+  /* allow a small extra boost for the final drops via --accent-boost */
+  transform: scale(calc(1 + var(--accent-pulse, 0) * (0.06 + var(--accent-boost, 0))));
+  /* Smooth transitions so pulse looks organic */
+  transition: transform 420ms cubic-bezier(0.22, 0.6, 0.2, 1), filter 420ms ease, opacity 420ms ease;
+  filter: brightness(calc(1.06 + var(--accent-pulse, 0) * 0.28)) saturate(0.05) drop-shadow(0 4px rgba(255, 111, 168, 0.75));
+  opacity: calc(0.12 + var(--accent-pulse, 0) * 0.08);
 }
 
 .page__scene::after {
@@ -213,7 +221,7 @@
   max-width: none;
   /* unify both laptops to initial width by default */
   height: auto;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease-out, filter 300ms ease-out;
 }
 
 /* Ensure main laptop is above fallen items and ghosts */
@@ -265,18 +273,20 @@
   height: 40px;
   transform: translate(var(--tx, 0px), var(--ty, 0px));
   opacity: 0;
-  transition: transform 700ms cubic-bezier(.22, .9, .35, 1), opacity 0.3s ease-in;
+  /* smoother, slightly longer transition for a softer fall */
+  transition: transform 1200ms cubic-bezier(0.16, 0.84, 0.24, 1), opacity 320ms ease-out;
 }
 
-/* Принудительно задаем цвет для всех элементов внутри чаш (если SVG через <img> — фильтр меняет цвет) */
+/* Принудительно задаем цвет и размытые тени для всех элементов внутри чаш (если SVG через <img> — фильтр меняет цвет). */
 .pan-target__item img,
 .pan-target__main img {
-  filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
+  /* color normalization + larger, softer drop-shadow for blurred shadow under icons */
+  filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 14px 22px rgba(0, 0, 0, 0.3));
 }
 
-/* Для падающего призрака — чуть более выраженная тень */
+/* Для падающего призрака — более выраженная и мягкая размытая тень */
 .falling-ghost {
-  filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 10px 8px rgba(0, 0, 0, 0.2));
+  filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 18px 28px rgba(0, 0, 0, 0.2));
 }
 
 .falling-ghost.land {
@@ -319,5 +329,5 @@
 }
 
 .pan-target__item--falling {
-  animation: fallIn 700ms ease-out both;
+  animation: fallIn 1200ms cubic-bezier(0.16, 0.84, 0.24, 1) both;
 }

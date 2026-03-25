@@ -108,6 +108,7 @@ import { icons, defaultSequence } from './config.js';
       return layoutPanItems(list, this.opts);
     }
 
+    // Специальная логика масштабирования для ноутбуков: уменьшать ширину основного изображения на левой панели (женской) по мере добавления элементов, чтобы создать иллюзию глубины и предотвратить слишком быстрое переполнение панели, в то время как правая панель (мужская) сохраняет постоянную ширину для более чистого вида
     _updateLaptopScaleForPan(pan) {
       if (!pan) return;
       const mainImg = pan.querySelector('.pan-target__main img');
@@ -240,11 +241,6 @@ import { icons, defaultSequence } from './config.js';
           ghost.style.setProperty('--ty', `0px`);
           void ghost.offsetWidth;
 
-          // requestAnimationFrame(() => {
-          //   ghost.style.setProperty('--tx', `${tx}px`);
-          //   ghost.style.setProperty('--ty', `${ty}px`);
-          //   ghost.classList.add('land');
-          // });
           let rafId = null;
           if (isSpiral) {
             // JS-driven спиральная анимация с использованием requestAnimationFrame
@@ -267,7 +263,7 @@ import { icons, defaultSequence } from './config.js';
             const targetLeftPx = targetLeft;
             const targetTopPx = targetTop;
 
-            const coils = 2.5; // меньше витков — компактнее
+            const coils = 4.0; // меньше витков — компактнее
             const thetaMax = Math.PI * 2 * coils; // макс. угол в радианах для заданного количества витков
             // уменьшенные радиусы/рост для более плотной спирали
             const startRadius = Math.max(4, Math.min(16, Math.round(ghostSize * 0.04)));
@@ -331,7 +327,7 @@ import { icons, defaultSequence } from './config.js';
                 mImg.className = 'pan-target__main-img';
                 // инициальная ширина берется из CSS-переменной; JS будет корректировать через _updateLaptopScaleForPan
                 // сохранить переход/zIndex, но избежать дублирования размера здесь
-                mImg.style.transition = 'width 0.3s ease';
+                mImg.style.transition = 'width 0.3s ease-out';
                 mImg.style.zIndex = 200;
                 main.appendChild(mImg);
                 // небольшая корректировка базовой линии для каждой стороны: левая (женская) немного ниже, чтобы лучше сидела на кривой SVG
@@ -363,6 +359,35 @@ import { icons, defaultSequence } from './config.js';
               const randomRotate = (Math.random() * 40 - 20); // -20..20deg
               li.style.setProperty('--item-rotation', `${randomRotate}deg`);
               list.appendChild(li);
+              // триггер пульсации на левом акценте, когда элементы приземляются в левую чашу
+              try {
+                const side = pan && pan.dataset && pan.dataset.side;
+                if (side === 'female') {
+                  // сила увеличивается с индексом стека (больше элементов -> сильнее пульсация)
+                  const max = Number(this.opts.laptopMaxCount) || 6;
+                  const normalized = Math.min(1, (idx + 1) / Math.max(1, max)); // 0..1
+                  // базовая + нормализованная шкала: обеспечивает, что первые элементы мягкие, а последующие сильнее
+                  const strength = Math.min(1, 0.2 + normalized * 0.9);
+                  // ритм пульсации: более высокий индекс -> более медленная, но более заметная пульсация
+                  try {
+                    const increment = (idx === 0) ? Math.max(0, strength * 0.6) : Math.max(0, strength * 0.15);
+                    this.increaseAccentBy(increment);
+                    // Если это одно из последних трёх падений (по отношению к max), небольшим шагом
+                    // увеличим визуальный "буст" размера, чтобы быстрая пульсация выглядела менее дергающейся.
+                    try {
+                      const threshold = Math.max(0, max - 3);
+                      if (idx >= threshold) {
+                        const pos = idx - threshold; // 0..2
+                        const add = 0.01 * (1 + pos); // 0.01, 0.02, 0.03
+                        const css = getComputedStyle(document.documentElement);
+                        const cur = parseFloat(css.getPropertyValue('--accent-boost')) || 0;
+                        const next = Math.min(0.06, cur + add);
+                        document.documentElement.style.setProperty('--accent-boost', String(next));
+                      }
+                    } catch (e) { }
+                  } catch (e) { }
+                }
+              } catch (e) { }
               try {
                 // восстановить JS-пирамидальную раскладку (горка), а затем обновить масштаб ноутбука
                 this._layoutPanItems(list);
@@ -409,10 +434,11 @@ import { icons, defaultSequence } from './config.js';
             ghost.addEventListener('animationend', onEnd);
           }
           //  безопасный таймаут: разрешить полную продолжительность спирали (плюс небольшой буфер), когда используется анимация спирали
-          const defaultFallback = 1400;
+          // Timeout резервного значения по умолчанию (мс) — должно быть >= длительности CSS transition/animation, чтобы избежать преждевременного завершения
+          const defaultFallback = 2200;
           let safeTimeout = defaultFallback;
           if (isSpiral) {
-            // derive ms from spiralDuration arg if present, fallback 4000ms
+            // вычисляем значение ms из аргумента spiralDuration, если он присутствует, иначе используем значение по умолчанию 4000ms
             let ms = 4000;
             if (typeof spiralDuration !== 'undefined' && spiralDuration !== null) {
               if (typeof spiralDuration === 'number') ms = Number(spiralDuration) || ms;
@@ -458,6 +484,51 @@ import { icons, defaultSequence } from './config.js';
         try { clearTimeout(to); } catch (e) { }
       }
       this._schedules.clear();
+    }
+
+    // событие по установке паузы падения элементов и таймированные падения с использованием экземпляра AudioDirector.
+    // audioDirector должен реализовывать метод `.schedule(timeInSeconds, callback)`.
+    scheduleLeftBowlSequence(audioDirector) {
+      if (!audioDirector || typeof audioDirector.schedule !== 'function') {
+        console.warn('Dropper.scheduleLeftBowlSequence requires an AudioDirector with schedule(t, fn)');
+        return;
+      }
+      try {
+        // пауза падений между 9s и 11s
+        audioDirector.schedule(9, () => { try { this.suspendDrops(); } catch (e) { console.warn('suspendDrops failed', e); } });
+        audioDirector.schedule(11, () => { try { this.resumeDrops(); } catch (e) { console.warn('resumeDrops failed', e); } });
+
+        // левая чаша: элементы для падения в указанные моменты времени
+        // предпочтительно использовать элементы из defaultSequence, чтобы избежать дублирования путей; в качестве резервного варианта использовать `icons`
+        const seq = (this.opts.defaultSequence || defaultSequence || []);
+        // собираем шаги с src + darken
+        let scheduledSteps = seq
+          .filter(s => s && s.side === 'female' && typeof s.src === 'string' && !s.src.toLowerCase().includes('laptop'))
+          .map(s => ({ src: s.src, darken: Number(s.darken) || 0 }))
+          .slice(0, 6);
+
+        if (scheduledSteps.length < 6) {
+          const more = (this.opts.icons || icons || []).filter(s => typeof s === 'string' && !s.toLowerCase().includes('laptop'));
+          scheduledSteps = scheduledSteps.concat(more.map(src => ({ src, darken: 0 }))).slice(0, 6);
+        }
+
+        // запоминаем, какие источники мы запланировали, чтобы внешние вызовы могли избежать повторного планирования
+        this._leftBowlSequenceItems = scheduledSteps.map(s => s.src);
+
+        const times = [11, 16, 23, 25, 28, 30];
+        const count = Math.min(times.length, scheduledSteps.length);
+        for (let i = 0; i < count; i++) {
+          const t = times[i];
+          const step = scheduledSteps[i];
+          audioDirector.schedule(t, () => {
+            try {
+              this.drop(step.src, { side: 'female' }).then(() => {
+                try { if (step.darken) this.adjustDarken(step.darken); } catch (e) { }
+              }).catch(e => console.warn('scheduled left-bowl drop failed', e));
+            } catch (e) { console.warn('scheduled left-bowl drop failed', e); }
+          });
+        }
+      } catch (e) { console.warn('scheduling left bowl drops failed', e); }
     }
 
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения
@@ -565,17 +636,67 @@ import { icons, defaultSequence } from './config.js';
       document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
     }
 
-    // Public: pulseAccent(strength) — триггер короткого пульса на левом акценте (0..1)
-    pulseAccent(strength = 1) {
-      const s = Math.min(1, Math.max(0, Number(strength) || 0));
-      document.documentElement.style.setProperty('--accent-pulse', String(s));
-      // small transient class to allow CSS transition/pulse
-      document.documentElement.classList.add('accent-pulse');
-      window.clearTimeout(this._accentPulseTimeout);
-      this._accentPulseTimeout = window.setTimeout(() => {
-        document.documentElement.classList.remove('accent-pulse');
-        document.documentElement.style.removeProperty('--accent-pulse');
-      }, 300 + Math.round(200 * s));
+    // Public: adjustDarken(delta) — incrementally increase/decrease dark level like runSequence's applyDarken
+    adjustDarken(delta = 1) {
+      const step = Number(delta) || 0;
+      if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
+      const maxSteps = Number(this.opts.laptopMaxCount) || 6;
+      this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
+      const eased = this._ease(this.darkLevelFloat);
+      const css = getComputedStyle(document.documentElement);
+      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const target = [255, 111, 168];
+      const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
+      const r = mix(baseLeft[0], target[0], eased);
+      const g = mix(baseLeft[1], target[1], eased);
+      const b = mix(baseLeft[2], target[2], eased);
+      document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
+    }
+
+    // Persistent cumulative accent: поддерживает уровень пульсации, который накапливается
+    // и не сбрасывается полностью между падениями. Вызов `increaseAccentBy(delta)`
+    // увеличивает уровень (0..1) и автоматически запускает RAF-цикл, который
+    // записывает в CSS-переменную `--accent-pulse` непрерывную пульсацию.
+    setAccentLevel(level = 0) {
+      const l = Math.max(0, Math.min(1, Number(level) || 0));
+      this._accentLevel = l;
+      if (l > 0) {
+        this._startAccentLoop();
+      } else {
+        this._stopAccentLoop();
+      }
+    }
+
+    increaseAccentBy(delta = 0.1) {
+      const d = Number(delta) || 0;
+      if (typeof this._accentLevel === 'undefined') this._accentLevel = 0;
+      this.setAccentLevel(Math.min(1, this._accentLevel + d));
+    }
+
+    _startAccentLoop() {
+      try { if (this._accentLoopRaf) return; } catch (e) { }
+      this._accentLoopStart = performance.now();
+      const loop = (now) => {
+        if (typeof this._accentLevel === 'undefined' || this._accentLevel <= 0) {
+          this._stopAccentLoop();
+          return;
+        }
+        const t = (now - this._accentLoopStart) / 1000; // секунды
+        // Частота и амплитуда растут с уровнем акцента
+        const freq = 0.4 + this._accentLevel * 2.0; // 0.4..2.4 Hz
+        const amp = 0.08 + this._accentLevel * 0.9; // 0.08..0.98
+        // синусоидальная пульсация от 0..amp, плюс небольшой базовый вклад от уровня
+        const value = Math.max(0, Math.min(1, ((Math.sin(2 * Math.PI * freq * t) * 0.5 + 0.5) * amp) + (this._accentLevel * 0.04)));
+        document.documentElement.style.setProperty('--accent-pulse', String(value));
+        this._accentLoopRaf = requestAnimationFrame(loop);
+      };
+      this._accentLoopRaf = requestAnimationFrame(loop);
+    }
+
+    _stopAccentLoop() {
+      try { if (this._accentLoopRaf) cancelAnimationFrame(this._accentLoopRaf); } catch (e) { }
+      this._accentLoopRaf = null;
+      try { document.documentElement.style.removeProperty('--accent-pulse'); } catch (e) { }
     }
 
     // Public: setBodyScale(scale) — набор CSS var для масштабирования тела (zoom/scale)
@@ -625,6 +746,9 @@ import { icons, defaultSequence } from './config.js';
       const css = getComputedStyle(document.documentElement);
       const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
       document.documentElement.style.setProperty('--left-bg', `rgb(${baseLeft[0]}, ${baseLeft[1]}, ${baseLeft[2]})`);
+      // сбросить накопленную пульсацию акцента
+      try { this.setAccentLevel(0); } catch (e) { }
+      try { document.documentElement.style.removeProperty('--accent-boost'); } catch (e) { }
     }
   }
 
