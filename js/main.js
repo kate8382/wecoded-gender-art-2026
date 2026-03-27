@@ -1,6 +1,7 @@
 import Dropper from './dropper.js';
 import AudioDirector from './audioDirector.js';
 import { zoomTimeline } from './config.js';
+import './confetti.js';
 
 class MainApp {
   constructor(opts = {}) {
@@ -87,6 +88,8 @@ class MainApp {
     btn.addEventListener('click', async () => {
       // start button clicked — before actions
       try {
+        // если конфетти всё ещё активно или оставило таймеры — остановим их и включим кнопку
+        try { if (window.Confetti && typeof window.Confetti._finish === 'function') window.Confetti._finish(); } catch (e) { }
         // подготовка свежей сцены перед воспроизведением; сначала сброс, чтобы _onAudioPlay мог запустить последовательность
         try { this.dropper.reset(); } catch (e) { console.warn('reset failed', e); }
         this.audio.muted = false;
@@ -110,6 +113,25 @@ class MainApp {
         console.warn('start button play failed', err);
       }
     });
+
+    // Обработчик клавиши Enter: при видимом оверлее Enter запускает тот же сценарий, что и клик Start
+    this._onStartKey = (e) => {
+      if (e && (e.key === 'Enter' || e.keyCode === 13)) {
+        try {
+          const ov = this.overlay;
+          if (!ov) return;
+          const styles = getComputedStyle(ov);
+          // реагируем только когда overlay видим/интерактивен
+          if (styles.visibility === 'visible' && styles.pointerEvents !== 'none' && styles.opacity !== '0') {
+            if (btn && !btn.disabled) {
+              btn.click();
+              e.preventDefault();
+            }
+          }
+        } catch (err) { }
+      }
+    };
+    try { window.addEventListener('keydown', this._onStartKey); } catch (e) { }
   }
 
   // Helper: скрыть overlay с переходом, затем установить display:none как запасной вариант

@@ -1,10 +1,10 @@
 /* Scene layout and page background (scales, pans and falling elements) */
 .page__scene {
-  /* needed for decorative pseudo-elements */
+  /* необходимы для декоративных псевдоэлементов */
   position: relative;
   flex: 1 1 auto;
   flex-direction: row;
-  /* center the scales section in the scene */
+  /* центрируем секцию весов в сцене */
   justify-content: center;
   align-items: center;
   width: 100%;
@@ -13,20 +13,19 @@
   overflow: hidden;
 }
 
+/* для позиционирования псевдоэлементов (гендерные значки) используем z-index 5, т.к. они должны быть выше фона сцены (z-index: 1), но ниже весов (z-index: 6) */
 .page__scene::before,
 .page__scene::after {
   content: "";
   position: absolute;
   top: 0;
   z-index: 5;
-  /* place icons above the page overlay */
   width: 25%;
   height: 100%;
   pointer-events: none;
   opacity: 0.12;
   background-repeat: no-repeat;
   background-size: 100px 100px;
-  /* behind the scales (scales use z-index:6) */
   filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(0, 0, 0, 0.06));
 }
 
@@ -35,14 +34,15 @@
   background-image: url('../img/venus.svg');
   background-position: 20% 11%;
   background-size: 100px 100px;
-  /* Allow JS-driven pulsing via --accent-pulse (0..1) */
+  /* Позволяет JS управлять пульсацией через --accent-pulse (0..1) */
   transform-origin: center center;
   will-change: transform, filter, opacity;
-  /* allow a small extra boost for the final drops via --accent-boost */
+  /* предусматривает небольшой дополнительный импульс для финальных капель через --accent-boost (значение добавляется к базовому масштабу) */
   transform: scale(calc(1 + var(--accent-pulse, 0) * (0.06 + var(--accent-boost, 0))));
-  /* Smooth transitions so pulse looks organic */
+  /* плавные переходы, чтобы пульсация выглядела органично */
   transition: transform 420ms cubic-bezier(0.22, 0.6, 0.2, 1), filter 420ms ease, opacity 420ms ease;
-  filter: brightness(calc(1.06 + var(--accent-pulse, 0) * 0.28)) saturate(0.05) drop-shadow(0 4px rgba(255, 111, 168, 0.75));
+  /* основной цветной drop-shadow + мягкий светлый ореол для видимости при затемнении фона */
+  filter: brightness(calc(1.06 + var(--accent-pulse, 0) * 0.28)) saturate(0.05) drop-shadow(0 4px rgba(255, 111, 168, 0.75)) drop-shadow(0 4px rgba(255, 255, 255, 0.80));
   opacity: calc(0.12 + var(--accent-pulse, 0) * 0.08);
 }
 
@@ -51,21 +51,21 @@
   background-image: url('../img/mars.svg');
   background-position: 80% 11%;
   background-size: 100px 100px;
-  filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(43, 124, 255));
+  filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(43, 124, 255, 0.75));
 }
 
 /* Scales container */
 .scene-scales {
-  /* bring scales above scene pseudo background icons */
+  /* выводим весы выше остальных элементов сцены z-index: 6 */
   position: relative;
   z-index: 6;
   width: 100%;
-  /* limit max width so layout stays predictable and keep a stable aspect */
+  /* ограничиваем максимальную ширину, чтобы макет оставался предсказуемым и сохранял стабильное соотношение сторон */
   max-width: 680px;
   height: auto;
-  /* center within flex container */
+  /* центрируем внутри flex-контейнера */
   margin: 0 auto;
-  /* aspect-ratio for responsive scaling */
+  /* соотношение сторон для адаптивного масштабирования */
   aspect-ratio: 16 / 9;
 }
 
@@ -81,7 +81,7 @@
   stroke-width: 0.6;
 }
 
-/* Make pans visually wider by scaling their SVG path horizontally and nudging left/right so they stay aligned under the beam. */
+/* делаем чаши весов визуально шире, масштабируя их SVG путь по горизонтали и сдвигая влево/вправо, чтобы они оставались выровненными под балкой. */
 .scales-svg .scales-svg__panpath {
   transform-box: fill-box;
   transform-origin: 50% 35%;
@@ -103,8 +103,8 @@
   }
 }
 
-/* Add subtle metallic sheen using pseudo-element on container */
-/* Silver variant: cooler base color and subtler sheen */
+/* добавляем тонкий металлический блеск с помощью псевдоэлемента на контейнере */
+/* серебряный вариант: более холодный базовый цвет и более тонкий блеск */
 .scales-svg {
   position: relative;
   /* aged silver base */
@@ -128,26 +128,26 @@
 }
 
 .scales-svg::after {
-  /* narrower sheen centered over the beam to avoid container edge artefacts */
+  /* более узкий блеск, центрированный над балкой, чтобы избежать артефактов на краях контейнера */
   content: "";
   position: absolute;
   left: 24%;
   top: 6%;
   width: 30%;
   height: 48%;
-  /* avoid fixed bottom offset so the sheen scales with the SVG/container */
-  /* lift main laptop above stacked items */
+  /* избегаем фиксированного смещения снизу, чтобы блеск масштабировался вместе с SVG/контейнером */
+  /* поднимаем основной ноутбук выше сложенных элементов */
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.16) 20%, rgba(255, 255, 255, 0.06) 60%, rgba(255, 255, 255, 0) 100%);
-  /* mix-blend-mode to create subtle overlay effect */
+  /* mix-blend-mode - режим смешивания для создания тонкого наложения */
   mix-blend-mode: overlay;
   transform: rotate(-10deg);
   filter: blur(5px);
   border-radius: 40px;
 }
 
-/* ground shadow to add volume */
+/* добавляем тень под весами для объема */
 .scales-shadow {
-  /* subtle shadow under the scales base only */
+  /* тонкая тень под основанием весов */
   width: 42%;
   margin-top: -12px;
   background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.08) 40%, rgba(0, 0, 0, 0) 80%);
@@ -156,42 +156,42 @@
 }
 
 /* Чаши весов */
-/* Prevent pointer interactions inside pans and their contents (avoids accidental hover/click
-   on decorative elements). This is applied once instead of repeating `pointer-events: none` everywhere. */
+/* Предотвращает взаимодействие указателя внутри панелей и их содержимого (избегаем случайного наведения курсора/щелчка по декоративным элементам). Это применяется один раз, вместо того чтобы повторять `pointer-events: none` повсюду. */
 .pan-target,
 .pan-target *,
 .falling-ghost {
   pointer-events: none;
 }
 
-/* Pan-target anchors placed over each cup to compute landing coords */
+/* Якоря Pan-target, размещенные над каждой чашей, для вычисления координат приземления. добавляем для чаш z-index: 80, чтобы они находились выше приземленных элементов */
 .pan-target {
-  /* Anchors over each cup — sized container so landed items can be positioned inside */
+  /* Якоря над каждой чашей — контейнер с размером, чтобы приземленные элементы могли быть размещены внутри */
   position: absolute;
-  /* ensure the whole pan (including `.pan-target__main`) sits above landed items */
-  z-index: 220;
-  /* make pan-target size responsive inside .scene-scales; keep a sensible min-width */
+  /* убедитесь, что вся панель (включая `.pan-target__main`) находится выше приземленных элементов */
+  z-index: 80;
+  /* делаем размер якоря адаптивным внутри .scene-scales; сохраняем разумную минимальную ширину */
   width: 27%;
   min-width: 140px;
   min-height: 100px;
-  /* center the anchor horizontally around the percentage-based `left` value */
+  /* центрируем якорь по горизонтали относительно процентного значения `left` */
   transform: translateX(-50%);
-  /* allow dropped items to grow upward without forcing the pan to resize */
+  /* позволяем приземленным элементам расти вверх, не заставляя панель изменять размер */
   overflow: visible;
 }
 
-/* Упавшие элементы должны быть ниже основного ноутбука */
+/* Упавшие элементы должны быть ниже основного ноутбука, добавляем для упавших элементов z-index: 20, который должен быть ниже z-index основного ноутбука (z-index: 60), но выше фона (z-index: 0) */
 .pan-target__item,
 .pan-target__item--landed {
-  z-index: 100;
+  z-index: 20;
 }
 
 .pan-target.pan-target--left {
-  /* positioned as percentage of .scene-scales width */
+  /* позиционирование падающих элементов для левой чаши */
   left: 18%;
   top: 57%;
 }
 
+/* падающие элементы внутри левого контейнера, у которых z-index: 50 выше упавших элементов (.pan-target__item: z-index: 20), но ниже основного ноутбука z-index: 60 */
 .pan-target__items {
   position: absolute;
   z-index: 50;
@@ -201,11 +201,12 @@
 }
 
 .pan-target.pan-target--right {
-  /* positioned as percentage of .scene-scales width */
+  /* позиционирование падающих элементов для правой чаши */
   left: 72%;
   top: 57%;
 }
 
+/* устанавливаем основной ноутбук (z-index: 60) выше падающих элементов (z-index: 50) */
 .pan-target--right.pan-target__main,
 .pan-target--left.pan-target__main {
   position: absolute;
@@ -219,12 +220,12 @@
 .pan-target__main img {
   width: var(--laptop-initial-width);
   max-width: none;
-  /* unify both laptops to initial width by default */
+  /* синхронизируем оба ноутбука с начальной шириной по умолчанию */
   height: auto;
   transition: width 0.3s ease-out, filter 300ms ease-out;
 }
 
-/* Ensure main laptop is above fallen items and ghosts */
+/* убеждаемся, что основной ноутбук находится выше упавших элементов и призраков (z-index: 200) */
 .pan-target__main {
   position: absolute;
   left: 50%;
@@ -234,7 +235,7 @@
   transform: translateX(-50%);
 }
 
-/* Landed items should be positioned relative to the pan (stacked) */
+/* Приземленные элементы должны быть позиционированы относительно панели (стек) */
 .pan-target__item--landed {
   position: absolute;
   left: calc(50% + var(--land-offset, 0px));
@@ -244,7 +245,7 @@
   bottom: calc(6px + (var(--stack-index, 0) * 18px) + var(--land-curve, 0px));
 }
 
-/* landed items are smaller inside the pans */
+/* приземленные элементы меньше внутри чаш */
 .pan-target__item--landed img {
   position: relative;
   left: 50%;
@@ -255,32 +256,32 @@
   transform: translateX(-50%);
 }
 
-/* Debug helper: toggle .debug on .pan-target while tuning positions */
+/* Debug helper: используйте toggle .debug на .pan-target при настройке позиций */
 .pan-target.debug {
   opacity: 0.18;
   background: rgba(255, 111, 168, 1);
   outline: 1px dashed rgba(0, 0, 0, 1);
 }
 
-/* floating ghost used during fall animation */
+/*  плавающий призрак, используемый во время анимации падения */
 .falling-ghost {
   position: fixed;
   left: 0;
   top: 0;
-  /* below the main laptop which has higher z-index */
+  /* ниже основного ноутбука, который имеет более высокий z-index (z-index: 200) */
   z-index: 40;
   width: 40px;
   height: 40px;
   transform: translate(var(--tx, 0px), var(--ty, 0px));
   opacity: 0;
-  /* smoother, slightly longer transition for a softer fall */
-  transition: transform 1200ms cubic-bezier(0.16, 0.84, 0.24, 1), opacity 320ms ease-out;
+  /* более плавный, слегка более длинный переход для мягкого падения */
+  transition: transform 1200ms cubic-bezier(0.16, 0.84, 0.24, 1), opacity 0.3s ease-out;
 }
 
 /* Принудительно задаем цвет и размытые тени для всех элементов внутри чаш (если SVG через <img> — фильтр меняет цвет). */
 .pan-target__item img,
 .pan-target__main img {
-  /* color normalization + larger, softer drop-shadow for blurred shadow under icons */
+  /*  нормализация цвета + большая, мягкая тень для размытой тени под иконками */
   filter: brightness(0) saturate(100%) invert(18%) sepia(0%) hue-rotate(188deg) brightness(95%) contrast(89%) drop-shadow(0 14px 22px rgba(0, 0, 0, 0.3));
 }
 
@@ -300,7 +301,7 @@
   /* JS будет устанавливать явные трансформации во время анимации */
 }
 
-/* Template variant of ghost: kept in DOM for preloading/measurement but hidden/offscreen */
+/* шаблонный вариант объекта Ghost: хранится в DOM для предварительной загрузки/измерения, но скрыт/за кадром. */
 .falling-ghost.template {
   position: fixed;
   left: 0;

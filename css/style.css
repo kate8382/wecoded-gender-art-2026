@@ -21,21 +21,21 @@ body {
   background: transparent;
   overflow: hidden;
   touch-action: none;
-  transition: background 0.3s ease;
+  transition: background 0.3s ease-out;
 }
 
-/* During initial zoom intro, apply a dark backdrop to the document body. Removed when zoom ends. */
+/* в начале zoom с увеличением масштаба применяет тёмный фон к документу. Убирается после завершения zoom. */
 body.zooming {
   background: var(--text-color);
 }
 
-/* When zooming, prefer body backdrop and hide page gradient so backdrop shows through */
+/* при увеличении масштаба, предпочитайте фон body и скрывайте градиент страницы, чтобы фон body был виден */
 body.zooming .page.scene-active {
   background: transparent !important;
 }
 
-/* During zoom, render the scene gradient inside the centered .page__zoom as a window
-   so the body backdrop shows around it. Adjust size to avoid footer clipping. */
+/* в течении увеличения масштаба, рендерьте градиент сцены внутри центрированного .page__zoom как окно,
+   чтобы фон body был виден вокруг него. Настройте размер, чтобы избежать обрезки футера. */
 body.zooming .page.scene-active .page__zoom {
   background: linear-gradient(90deg, var(--left-bg) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
   max-width: 1100px;
@@ -48,7 +48,7 @@ body.zooming .page.scene-active .page__zoom {
   margin: auto;
 }
 
-/* Keep inner scene content normalized to the zoom container size */
+/* держим внутреннее содержимое сцены нормализованным по размеру контейнера масштабирования */
 body.zooming .page.scene-active .page__scene {
   width: 100%;
   height: 100%;
@@ -88,30 +88,29 @@ button {
   display: flex;
 }
 
-/* ensure positioned pseudo-elements and overlays are relative to page (добавили позиционирование для псевдоэлементов и оверлеев, таких как весы) */
+/* добавили позиционирование для псевдоэлементов и оверлеев, таких как весы. начинаем с основного контейнера, где z-index начинается с 1 */
 .page {
   position: relative;
+  /* Явный z-index, чтобы порядок слоёв был предсказуемым относительно оверлея */
+  z-index: 1;
   flex-direction: column;
   width: 100%;
   height: 100vh;
   background: transparent;
-  /* Явный z-index, чтобы порядок слоёв был предсказуемым относительно оверлея */
-  z-index: 1;
-  transition: background 0.3s ease, opacity 0.3s ease, transform 0.2s ease;
+  transition: background 0.3s ease-out, opacity 0.3s ease-out, transform 0.2s ease-out;
 }
 
-/* Container used solely for scene scaling/zoom to avoid conflicting transforms on absolute children */
+/* контейнер, используемый исключительно для масштабирования/увеличения сцены, чтобы избежать конфликтов трансформаций на абсолютных дочерних элементах */
 .page__zoom {
   width: 100%;
   height: 100%;
   transform-origin: center center;
   transform: scale(var(--body-scale, 1));
-  transition: transform 360ms cubic-bezier(.2, .9, .2, 1);
+  transition: transform 360ms cubic-bezier(0.2, 0.9, 0.2, 1);
   will-change: transform;
 }
 
-/* Keep zoom container centered so scaling grows/shrinks around center without shifting layout.
-   This avoids footer being affected and reduces layout jumps. */
+/* держим контейнер масштабирования центрированным, чтобы увеличение/уменьшение происходило вокруг центра без смещения макета. Это предотвращает влияние на футер и уменьшает скачки макета. */
 .page__zoom {
   display: flex;
   flex-direction: column;
@@ -125,12 +124,12 @@ button {
   }
 }
 
-/* apply scene gradient only when page is active */
+/* держим градиент сцены только когда страница активна */
 .page.scene-active {
   background: linear-gradient(90deg, var(--left-bg) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
 }
 
-/* hide scene visually until user starts (page gains .scene-active) */
+/* скрываем сцену визуально до начала (страница получает .scene-active) */
 .page:not(.scene-active) .page__scene {
   opacity: 0;
   pointer-events: none;
@@ -163,11 +162,10 @@ button {
   align-items: center;
   justify-content: center;
   gap: 24px;
-  /* dark backdrop while overlay is visible */
+  /* тёмный фон, пока оверлей видим */
   background: var(--text-color);
-  /* Overlay должен быть выше сцены — задаём высокую ступень z-index.
-     Конфети использует z-index около 10001, поэтому ставим overlay выше. */
-  z-index: 10002;
+  /* Overlay должен быть выше сцены — задаём высокую ступень z-index. Конфети использует z-index около 10001, поэтому ставим overlay выше. */
+  z-index: 300;
   pointer-events: auto;
   /* transitions for hide/show via classes */
   opacity: 1;
@@ -184,8 +182,8 @@ button {
   background: var(--text-color);
 }
 
-/* prefer visibility/opacity toggle over display:none so transitions run smoothly;
-   use the `removed` class to fully remove from layout/hit-testing after transition */
+/*  предпочитаем переключение видимости/непрозрачности вместо display:none, чтобы переходы работали плавно;
+   используем класс `removed`, чтобы полностью удалить из макета/области взаимодействия после перехода */
 .start-overlay.hidden {
   opacity: 0;
   visibility: hidden;
@@ -193,17 +191,18 @@ button {
   transform: translateY(-6px);
 }
 
-/* fully remove overlay from layout/stacking when 'removed' is applied */
+/* полностью удаляем оверлей из макета/стеков, когда применяется класс 'removed' */
 .start-overlay.removed {
   display: none;
 }
 
-/* allow making overlay background transparent during playback */
+/* позволяем делать фон оверлея прозрачным во время воспроизведения */
 .start-overlay.transparent {
   background: transparent;
 }
 
 .start-overlay>div {
+  position: relative;
   text-align: center;
 }
 
@@ -214,7 +213,7 @@ button {
   border-radius: 14px;
   background: linear-gradient(90deg, var(--accent-pink) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--accent-blue) 100%);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-  transition: transform 0.3s ease, filter 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  transition: background 0.22s ease;
 }
 
 .start-button__icon {
@@ -224,55 +223,60 @@ button {
 }
 
 .start-button:hover,
-.start-button:focus {
+.start-button:focus,
+.start-button:focus-visible {
   background: linear-gradient(90deg, var(--left) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);
-  transform: translateY(-4px);
-  filter: saturate(1.15);
-}
-
-/* entrance pop for start button */
-.start-button {
-  animation: popIn 0.34s cubic-bezier(.2, .9, .2, 1) both;
-}
-
-@keyframes popIn {
-  0% {
-    transform: translateY(6px) scale(0.98);
-    opacity: 0
-  }
-
-  60% {
-    transform: translateY(-2px) scale(1.02);
-    opacity: 1
-  }
-
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1
-  }
 }
 
 .the-end {
   display: block;
-  margin-bottom: 18px;
-  font-size: 48px;
-  letter-spacing: 8px;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 18px);
+  transform: translateX(-50%) translateY(8px) scale(.98);
+  transform-origin: center;
+  margin: 0;
+  font-size: clamp(28px, 4.5vw, 48px);
+  letter-spacing: 3px;
   color: var(--accent-pink);
+  white-space: nowrap;
   opacity: 0;
-  transform: translateY(8px) scale(.98);
-  transition: opacity 0.36s ease, transform .36s cubic-bezier(.2, .9, .2, 1);
+  transition: opacity 0.36s ease, transform 0.36s cubic-bezier(0.2, 0.9, 0.2, 1);
+
+  @media (max-width: 420px) {
+
+    bottom: calc(100% + 12px);
+    letter-spacing: 2px;
+  }
 }
 
 .the-end.visible {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
 }
 
-/* Confetti container (hidden until celebration) */
+/* Confetti container and item styles */
 .confetti-container {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 10001;
+  /* ставим конфетти выше стартового оверлея (z-index:300), чтобы конфетти было видно */
+  z-index: 350;
   overflow: visible;
+}
+
+.confetti-item {
+  position: fixed;
+  will-change: transform, opacity;
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  transform-origin: center center;
+  opacity: 1;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.18));
+}
+
+.confetti-item .confetti-svg {
+  width: 100%;
+  height: 100%;
 }

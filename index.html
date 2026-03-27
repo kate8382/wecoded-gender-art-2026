@@ -7,21 +7,22 @@
   <!-- site favicon: scales -->
   <link href="img/scale.svg" rel="icon" type="image/svg+xml">
   <link href="img/scale.svg" rel="apple-touch-icon">
-  <title>WeCoded — Gender Equity Art 2026</title>
+  <title>Gender Equity Art 2026</title>
   <link href="css/normalize.css" rel="stylesheet">
   <link href="css/style.css" rel="stylesheet">
-  <script src="js/main.js" type="module" defer></script>
+  <!-- убираем defer, т.к. скрипт использует type="module" -->
+  <script src="js/main.js" type="module"></script>
 </head>
 
 <body>
   <div class="page flex">
     <div class="page__zoom" id="pageZoom">
     <header class="page__header">
-      <h1 class="visually-hidden">Gender Equity — Frontend Art</h1>
+      <h1 class="visually-hidden">Gender Equity Art 2026</h1>
     </header>
 
-    <main class="page__scene flex" role="main">
-        <section class="scene-scales" aria-label="Scales which represent gender equity" role="img">
+    <main class="page__scene flex">
+      <section class="scene-scales" aria-label="Scales which represent gender equity">
           <!-- inline scales SVG for easier styling -->
           <svg class="scene-scales-svg scales-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" role="img">
             <g stroke-linecap="round" stroke-linejoin="round" fill="none">
@@ -48,7 +49,7 @@
         </main>   
 
     <footer class="page__footer flex">
-      <p class="page__footer-note">&copy;&nbsp;Ecaterina Sevciuc&nbsp;&mdash; <a href="https://github.com/kate8382/wecoded-gender-art-2026.git" target="_blank" rel="noopener">Gender Equity Art</a> for WeCoded 2026</p>
+      <p class="page__footer-note">&copy;&nbsp;Ecaterina Sevciuc&nbsp;&mdash; <a href="https://github.com/kate8382/wecoded-gender-art-2026.git" target="_blank" rel="noopener">Gender Equity Art</a> for <a href="https://dev.to/devteam/join-the-2026-wecoded-challenge-and-celebrate-underrepresented-voices-in-tech-through-writing--4828?" target="_blank" rel="noopener">WeCoded 2026</a></p>
     </footer>
 
     </div>

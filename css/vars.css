@@ -3,12 +3,10 @@
   --left: #ffe6f3;
   --left-bg: var(--left);
   --darkness-opacity: 0;
-  --accent-blue: rgb(43, 124, 255);
-  --accent-pink: rgb(255, 111, 168);
-  --light-pink: rgba(255, 111, 168, 0.66);
-  --medium-pink: rgba(255, 111, 168, 0.88);
+  --accent-blue: #2b7cff;
+  --accent-pink: #ff6fa8;
   --text-color: #333;
-  /* pan / layout tuning exposed as CSS custom properties so JS can read them */
+  /* pan / layout настройка параметров отображается в виде пользовательских свойств CSS, поэтому JS может их считывать */
   --pan-item-w: 36px;
   --pan-item-h: 36px;
   --pan-gap: 4px;
