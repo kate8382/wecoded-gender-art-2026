@@ -77,10 +77,13 @@
     // start(options) — options: { duration(ms), total, slow }
     start(opts = {}) {
       if (this.running) return;
-      const duration = Number(opts.duration) || DEFAULT_DURATION; // общее время от начала до конца анимации (включая падение), используем для планирования спауна и общей продолжительности
+      const requestedDuration = (typeof opts.duration === 'number' && !isNaN(opts.duration)) ? Number(opts.duration) : null;
+      // если duration не передан, будем вычислять безопасное завершение ниже на основе спауна и TTL частиц
+      const duration = requestedDuration || DEFAULT_DURATION;
       const total = Number(opts.total) || DEFAULT_TOTAL; /// общее количество частиц для спауна (по половине для каждой стороны), используем для планирования спауна
-      const slow = !!opts.slow;
-      console.debug('Confetti: start()', { duration, total, slow });
+      // убираем режим "slow" — эффекты замедления убираем, частицы всегда используют обычную скорость
+      const slow = false;
+      console.debug('Confetti: start()', { duration, total });
       this.running = true;
       const btn = document.getElementById('startButton');
       if (btn) { try { btn.disabled = true; } catch (e) { } }
@@ -89,7 +92,7 @@
       const vh = Math.max(200, window.innerHeight || 600);
 
       const half = Math.floor(total / 2);
-      const burstTime = Math.max(200, Math.min(BURST_TIME, duration * 0.5));
+      const burstTime = Math.max(200, Math.min(BURST_TIME, requestedDuration ? Math.round(duration * 0.5) : BURST_TIME));
       let emittedLeft = 0, emittedRight = 0;
 
       // функции для спауна частиц с левой и правой стороны, с вариациями скорости, угла и цвета для естественного вида
@@ -175,13 +178,15 @@
       };
       this.raf = requestAnimationFrame(loop);
 
-      // безопасность: обеспечить завершение работы после истечения установленного времени + буфер, чтобы избежать зависания в случае ошибок
+      // безопасность: вычислим ожидаемое время полного завершения сцены
+      const maxParticleTtlSec = 6.2; // верхняя граница ttl (в секундах) — slow отключён
+      const estimatedFinishMs = Math.round(burstTime + (maxParticleTtlSec * 1000) + 300); // +300ms buffer
+      const safetyMs = requestedDuration ? Math.max(requestedDuration, estimatedFinishMs) : estimatedFinishMs;
       if (this._safetyTimeout) { try { clearTimeout(this._safetyTimeout); } catch (e) { } }
       this._safetyTimeout = setTimeout(() => {
         if (this._emitterInterval) { clearInterval(this._emitterInterval); this._emitterInterval = null; }
-        // дополнительная небольшая задержка на завершение анимаций
-        this._safetyTimeout = setTimeout(() => { if (!this.particles.length) this._finish(); else this._finish(); }, 1200);
-      }, duration);
+        this._finish();
+      }, safetyMs);
     }
 
     // осторожно: этот метод может быть вызван из разных мест, убедитесь, что он идемпотентный и безопасный для повторного вызова

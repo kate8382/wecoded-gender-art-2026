@@ -224,6 +224,15 @@ import { icons, defaultSequence } from './config.js';
           ghost.style.width = `${ghostSize}px`;
           ghost.style.height = `${ghostSize}px`;
 
+          // If this is a laptop ghost (non-spiral), increase the transition duration specifically for laptops
+          try {
+            const baseGhostMs = 1200; // matches CSS default
+            const laptopExtra = 500; // add 500ms for laptops
+            if (!isSpiral && isLaptop) {
+              ghost.style.transition = `transform ${baseGhostMs + laptopExtra}ms cubic-bezier(0.16, 0.84, 0.24, 1), opacity 0.3s ease-out`;
+            }
+          } catch (e) { }
+
           // стартовая позиция (над верхом окна)
           const startX = target.x;
           const startY = -Math.max(80, ghostSize + 20);
@@ -244,7 +253,7 @@ import { icons, defaultSequence } from './config.js';
           let rafId = null;
           if (isSpiral) {
             // JS-driven спиральная анимация с использованием requestAnimationFrame
-            let durationMs = 4000;
+            let durationMs = 5000;
             if (typeof spiralDuration !== 'undefined' && spiralDuration !== null) {
               if (typeof spiralDuration === 'number') durationMs = Number(spiralDuration) || durationMs;
               else if (typeof spiralDuration === 'string') {
@@ -263,7 +272,7 @@ import { icons, defaultSequence } from './config.js';
             const targetLeftPx = targetLeft;
             const targetTopPx = targetTop;
 
-            const coils = 4.0; // меньше витков — компактнее
+            const coils = 5.0; // меньше витков — компактнее
             const thetaMax = Math.PI * 2 * coils; // макс. угол в радианах для заданного количества витков
             // уменьшенные радиусы/рост для более плотной спирали
             const startRadius = Math.max(4, Math.min(16, Math.round(ghostSize * 0.04)));
@@ -330,12 +339,8 @@ import { icons, defaultSequence } from './config.js';
                 mImg.style.transition = 'width 0.3s ease-out';
                 mImg.style.zIndex = 200;
                 main.appendChild(mImg);
-                // небольшая корректировка базовой линии для каждой стороны: левая (женская) немного ниже, чтобы лучше сидела на кривой SVG
-                if (pan && pan.dataset && pan.dataset.side === 'female') {
-                  main.style.bottom = '8px';
-                } else {
-                  main.style.bottom = '12px';
-                }
+                // Устанавливаем единый базовый отступ для основного изображения (берётся из opts.baseBottom)
+                try { main.style.bottom = this.opts.baseBottom + 'px'; } catch (e) { }
                 pan.classList.add('has-main');
                 // удалить падающий ghost для ноутбучных падений, так как мы создали постоянное основное изображение
                 requestAnimationFrame(() => {
@@ -439,8 +444,8 @@ import { icons, defaultSequence } from './config.js';
           const defaultFallback = 2200;
           let safeTimeout = defaultFallback;
           if (isSpiral) {
-            // вычисляем значение ms из аргумента spiralDuration, если он присутствует, иначе используем значение по умолчанию 4000ms
-            let ms = 4000;
+            // вычисляем значение ms из аргумента spiralDuration, если он присутствует, иначе используем значение по умолчанию 5000ms
+            let ms = 5000;
             if (typeof spiralDuration !== 'undefined' && spiralDuration !== null) {
               if (typeof spiralDuration === 'number') ms = Number(spiralDuration) || ms;
               else if (typeof spiralDuration === 'string') {
@@ -735,6 +740,11 @@ import { icons, defaultSequence } from './config.js';
         if (main) {
           main.innerHTML = '';
           pan.classList.remove('has-main');
+          try {
+            // сброс inline-стилей, которые могли быть выставлены при предыдущем прогоне
+            main.style.bottom = this.opts.baseBottom + 'px';
+            main.style.position = '';
+          } catch (e) { }
         }
         //  сбросить любые встроенные стили bottom/width
         const mainImg = pan.querySelector('.pan-target__main img');
@@ -759,6 +769,3 @@ import { icons, defaultSequence } from './config.js';
 
 //  экспортируем класс и избегаем автоматического запуска; main.js должен создавать экземпляр и управлять воспроизведением
 export default Dropper;
-
-
-
