@@ -1,4 +1,4 @@
-import { getRowCount, layoutPanItems, computeTargetPosition } from './layout.js';
+import { getRowCount, layoutPanItems, computeTargetPosition, updatePanItemsContainerHeight, adjustMainForPile, updateLaptopScaleForPan, parseColor, ease } from './layout.js';
 import { icons, defaultSequence } from './config.js';
 
 const DEBUG = false;
@@ -112,88 +112,17 @@ const DEBUG = false;
 
     // Специальная логика масштабирования для ноутбуков: уменьшать ширину основного изображения на левой панели (женской) по мере добавления элементов, чтобы создать иллюзию глубины и предотвратить слишком быстрое переполнение панели, в то время как правая панель (мужская) сохраняет постоянную ширину для более чистого вида
     _updateLaptopScaleForPan(pan) {
-      if (!pan) return;
-      const mainImg = pan.querySelector('.pan-target__main img');
-      if (!mainImg) return;
-      // только уменьшать ноутбук на левой панели (female). Правая панель остается с начальной шириной.
-      const side = pan.dataset && pan.dataset.side;
-      const initial = this.opts.laptopInitialWidth;
-      if (side !== 'female') {
-        mainImg.style.width = initial + 'px';
-        return;
-      }
-      const list = pan.querySelector('.pan-target__items');
-      const count = list ? list.querySelectorAll('.pan-target__item').length : 0;
-      const min = this.opts.laptopMinWidth;
-      const maxCount = this.opts.laptopMaxCount;
-      const diff = initial - min;
-      const perItem = diff / maxCount;
-      const newWidth = Math.max(min, Math.round(initial - count * perItem));
-      mainImg.style.width = newWidth + 'px';
+      return updateLaptopScaleForPan(pan, this.opts);
     }
 
     // Убедиться, что контейнер .pan-target__items растет, чтобы вместить сложенные элементы
     _updatePanItemsContainerHeight(list, pan) {
-      if (!list) return;
-      const items = Array.from(list.querySelectorAll('.pan-target__item'));
-      const total = items.length;
-      if (!total) {
-        list.style.height = '';
-        list.style.top = '';
-        list.style.bottom = '';
-        return;
-      }
-
-      const rowSpacing = this.opts.rowSpacing;
-      const baseBottom = this.opts.baseBottom;
-      const itemH = this.opts.itemH;
-
-      const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
-      const rows = this._getRowCount(total, containerWidth);
-
-      // требуемая высота: смещение снизу верхнего ряда + высота элемента + небольшой отступ
-      const required = baseBottom + (rows - 1) * rowSpacing + itemH + 6;
-
-      // установить явную высоту для контейнера элементов и закрепить его внизу панели
-      list.style.height = required + 'px';
-      list.style.top = 'auto';
-      list.style.bottom = baseBottom + 'px';
-      // избежать изменения размера панели — позволить элементам выходить за пределы вверх при необходимости
-      if (pan) {
-        pan.style.minHeight = pan.style.minHeight || getComputedStyle(pan).minHeight;
-      }
+      return updatePanItemsContainerHeight(list, pan, this.opts);
     }
 
     // Настроить вертикальное положение основного ноутбука, чтобы он визуально располагался на вершине стопки
     _adjustMainForPile(pan) {
-      if (!pan) return;
-      const list = pan.querySelector('.pan-target__items');
-      const mainWrap = pan.querySelector('.pan-target__main');
-      if (!list || !mainWrap) return;
-
-      // убедиться, что обертка позиционирована (она уже должна быть по CSS)
-      mainWrap.style.position = mainWrap.style.position;
-
-      const items = Array.from(list.querySelectorAll('.pan-target__item'));
-      const total = items.length;
-      const baseBottom = this.opts.baseBottom;
-      const rowSpacing = this.opts.rowSpacing;
-      const itemH = this.opts.itemH;
-
-      if (!total) {
-        mainWrap.style.bottom = baseBottom + 'px';
-        return;
-      }
-
-      // вычислить количество рядов, используя тот же алгоритм, что и в _layoutPanItems
-      const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
-      const rows = this._getRowCount(total, containerWidth);
-
-      const topRowBottom = baseBottom + (rows - 1) * rowSpacing;
-      // позиционировать обертку так, чтобы основной элемент визуально располагался на стопке; небольшой отрицательный перекрытие для естественного вида
-      const overlap = this.opts.overlap; // сколько пикселей main должен перекрывать верхний ряд для лучшего визуального эффекта
-      const targetBottom = topRowBottom + itemH - overlap;
-      mainWrap.style.bottom = Math.max(baseBottom, targetBottom) + 'px';
+      return adjustMainForPile(pan, this.opts);
     }
 
     // Основной метод для анимации падения элемента в чашу; возвращает Promise, который резолвится после завершения анимации и добавления элемента в чашу
@@ -315,14 +244,14 @@ const DEBUG = false;
           // finalize функция, которая выполняется при завершении анимации или по таймауту, чтобы гарантировать, что элемент будет добавлен в чашу даже если событие transitionend не сработает
           const finalize = (opts = {}) => {
             if (finished) return;
+            let rootCss = null;
+            try { rootCss = getComputedStyle(document.documentElement); } catch (e) { rootCss = null; }
             finished = true;
             if (timeoutId) clearTimeout(timeoutId);
             // cancel any RAF-driven spiral
             try { if (typeof rafId !== 'undefined' && rafId) cancelAnimationFrame(rafId); } catch (e) { }
             ghost.removeEventListener('transitionend', onEnd);
             ghost.removeEventListener('animationend', onEnd);
-
-            // создадим элемент <li> только для неосновных элементов (обрабатывается в ветке ниже)
 
             if (isLaptop && main) {
               // избежать создания дублирующего основного изображения, когда оно уже существует
@@ -386,8 +315,7 @@ const DEBUG = false;
                       if (idx >= threshold) {
                         const pos = idx - threshold; // 0..2
                         const add = 0.01 * (1 + pos); // 0.01, 0.02, 0.03
-                        const css = getComputedStyle(document.documentElement);
-                        const cur = parseFloat(css.getPropertyValue('--accent-boost')) || 0;
+                        const cur = parseFloat((rootCss && rootCss.getPropertyValue('--accent-boost')) || 0) || 0;
                         const next = Math.min(0.06, cur + add);
                         document.documentElement.style.setProperty('--accent-boost', String(next));
                       }
@@ -547,13 +475,13 @@ const DEBUG = false;
 
       // читаем базовый левый цвет из CSS-переменной `--left` и устанавливаем целевой акцент
       const css = getComputedStyle(document.documentElement);
-      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
       const target = [255, 111, 168]; // accent pink
 
       const applyDarken = (delta) => {
         const step = Number(delta) || 0;
         this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
-        const eased = this._ease(this.darkLevelFloat);
+        const eased = ease(this.darkLevelFloat);
         // смешиваем baseLeft и target по фактору eased
         const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
         const r = mix(baseLeft[0], target[0], eased);
@@ -598,44 +526,17 @@ const DEBUG = false;
     // Приостановка/возобновление падений не-ноутбуков (полезно для сфокусированного тестирования)
     suspendDrops() { this._suspended = true; }
     resumeDrops() { this._suspended = false; }
-    // public helper: парсинг цветовых строк (#rgb, #rrggbb, rgb(r,g,b))
-    parseColor(str) {
-      if (!str) return null;
-      str = String(str).trim();
-      if (str[0] === '#') {
-        const hex = str.slice(1);
-        if (hex.length === 3) {
-          return [
-            parseInt(hex[0] + hex[0], 16),
-            parseInt(hex[1] + hex[1], 16),
-            parseInt(hex[2] + hex[2], 16)
-          ];
-        }
-        if (hex.length === 6) {
-          return [
-            parseInt(hex.slice(0, 2), 16),
-            parseInt(hex.slice(2, 4), 16),
-            parseInt(hex.slice(4, 6), 16)
-          ];
-        }
-      }
-      const m = str.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-      if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
-      return null;
-    }
+    // parseColor is provided by layout.js
 
-    // easing: easeInOutCubic
-    _ease(t) {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    }
+    // easing provided by layout.js as `ease`
 
     // Public: setDarkLevel(0..1) —  установить прогрессивное затемнение (обновляет --left-bg)
     setDarkLevel(value) {
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
       this.darkLevelFloat = Math.min(1, Math.max(0, Number(value) || 0));
-      const eased = this._ease(this.darkLevelFloat);
+      const eased = ease(this.darkLevelFloat);
       const css = getComputedStyle(document.documentElement);
-      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
       const target = [255, 111, 168];
       const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
       const r = mix(baseLeft[0], target[0], eased);
@@ -650,9 +551,9 @@ const DEBUG = false;
       if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
       this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
-      const eased = this._ease(this.darkLevelFloat);
+      const eased = ease(this.darkLevelFloat);
       const css = getComputedStyle(document.documentElement);
-      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
       const target = [255, 111, 168];
       const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
       const r = mix(baseLeft[0], target[0], eased);
@@ -754,14 +655,13 @@ const DEBUG = false;
         pan.style.minHeight = '';
       });
 
-      //  сбросить уровень затемнения и CSS-переменную
+      // сбросить уровень затемнения и CSS-переменные — удаляем inline-vars чтобы вернуть дефолты стилей
       this.darkLevelFloat = 0;
-      const css = getComputedStyle(document.documentElement);
-      const baseLeft = this.parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
-      document.documentElement.style.setProperty('--left-bg', `rgb(${baseLeft[0]}, ${baseLeft[1]}, ${baseLeft[2]})`);
-      // сбросить накопленную пульсацию акцента
       try { this.setAccentLevel(0); } catch (e) { }
+      try { document.documentElement.style.removeProperty('--left-bg'); } catch (e) { }
       try { document.documentElement.style.removeProperty('--accent-boost'); } catch (e) { }
+      try { document.documentElement.style.removeProperty('--accent-pulse'); } catch (e) { }
+      try { document.documentElement.style.removeProperty('--body-scale'); } catch (e) { }
     }
   }
 
