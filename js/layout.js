@@ -1,3 +1,5 @@
+import { accentColor } from './config.js';
+
 // функция для вычисления количества рядов, необходимых для размещения заданного количества элементов с учетом ширины контейнера и отступов
 export function getRowCount(total, containerWidth, opts) {
   const itemW = opts.itemW;
@@ -197,7 +199,7 @@ export function parseColor(str) {
   return null;
 }
 
-// easing: easeInOutCubic
+// easing: easeInOutCubic для более плавного прогресса зума и затемнения
 export function ease(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
@@ -213,3 +215,19 @@ export function readRootVars(...names) {
     return out;
   } catch (e) { return {}; }
 }
+
+// установка фонового цвета левой панели с учетом заданного eased фактора (0..1)
+export function applyLeftBg(eased) {
+  try {
+    const vars = readRootVars('--left');
+    const baseLeft = parseColor(vars['--left'] || '#ffe6f3') || [255, 230, 243];
+    const target = Array.isArray(accentColor) ? accentColor : parseColor(accentColor) || [255, 111, 168];
+    const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
+    const r = mix(baseLeft[0], target[0], eased);
+    const g = mix(baseLeft[1], target[1], eased);
+    const b = mix(baseLeft[2], target[2], eased);
+    document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
+  } catch (e) { }
+}
+
+
