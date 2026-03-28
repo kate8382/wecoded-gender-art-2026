@@ -1,4 +1,4 @@
-import { getRowCount, layoutPanItems, computeTargetPosition, updatePanItemsContainerHeight, adjustMainForPile, updateLaptopScaleForPan, parseColor, ease, readRootVars } from './layout.js';
+import { getRowCount, layoutPanItems, computeTargetPosition, updatePanItemsContainerHeight, adjustMainForPile, updateLaptopScaleForPan, ease, readRootVars, applyLeftBg } from './layout.js';
 import { icons, defaultSequence } from './config.js';
 
 const DEBUG = false;
@@ -23,8 +23,6 @@ const DEBUG = false;
         overlap: 2,
         // стандартная последовательность падений (может быть переопределена через opts)
         defaultSequence: defaultSequence,
-        // автоматически запускать стандартную последовательность при создании (может контролироваться извне)
-        autoRun: true
       };
 
       this.opts = Object.assign({}, defaults, opts);
@@ -57,7 +55,6 @@ const DEBUG = false;
         // игнорировать, если выполняется в среде без браузера
       }
 
-      this.root = document.querySelector(this.opts.containerSelector) || document.body;
       this.pans = Array.from(document.querySelectorAll(this.opts.panSelector));
       // карта планировщика для внешне запланированных падений (id -> timeout)
       this._schedules = new Map();
@@ -74,11 +71,6 @@ const DEBUG = false;
     // Метод, возвращающий стандартную последовательность падений (можно переопределить через opts)
     getDefaultSequence() {
       return (this.opts.defaultSequence || defaultSequence || []).slice();
-    }
-
-    // Вспомогательная функция: возвращает количество рядов для заданного числа элементов
-    _getRowCount(total, containerWidth) {
-      return getRowCount(total, containerWidth, this.opts);
     }
 
     // Метод, создающий плавающий элемент для анимации падения
@@ -330,8 +322,7 @@ const DEBUG = false;
                 this._updatePanItemsContainerHeight(list, pan);
                 // скорректировать вертикальное положение основного ноутбука, чтобы он опирался на стопку
                 this._adjustMainForPile(pan);
-                // обновить только текущий пан после изменения раскладки
-                try { this._updateLaptopScaleForPan(pan); } catch (e) { }
+                // обновление масштаба уже выполнено выше; дополнительный вызов удалён
               } catch (e) {
                 // ignore
               }
@@ -472,21 +463,11 @@ const DEBUG = false;
       if (typeof this.darkLevelFloat === 'undefined') this.darkLevelFloat = 0;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
 
-      // читаем базовый левый цвет из CSS-переменной `--left` и устанавливаем целевой акцент
-      const vars = readRootVars('--left');
-      const baseLeft = parseColor(vars['--left'] || '#ffe6f3') || [255, 230, 243];
-      const target = [255, 111, 168]; // accent pink
-
       const applyDarken = (delta) => {
         const step = Number(delta) || 0;
         this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
         const eased = ease(this.darkLevelFloat);
-        // смешиваем baseLeft и target по фактору eased
-        const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
-        const r = mix(baseLeft[0], target[0], eased);
-        const g = mix(baseLeft[1], target[1], eased);
-        const b = mix(baseLeft[2], target[2], eased);
-        document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
+        try { applyLeftBg(eased); } catch (e) { }
       };
 
       // определяем, является ли шаг падением ноутбука, для оптимизации соседних падений ноутбуков в разные чаши
@@ -531,17 +512,9 @@ const DEBUG = false;
 
     // Public: setDarkLevel(0..1) —  установить прогрессивное затемнение (обновляет --left-bg)
     setDarkLevel(value) {
-      const maxSteps = Number(this.opts.laptopMaxCount) || 6;
       this.darkLevelFloat = Math.min(1, Math.max(0, Number(value) || 0));
       const eased = ease(this.darkLevelFloat);
-      const css = getComputedStyle(document.documentElement);
-      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
-      const target = [255, 111, 168];
-      const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
-      const r = mix(baseLeft[0], target[0], eased);
-      const g = mix(baseLeft[1], target[1], eased);
-      const b = mix(baseLeft[2], target[2], eased);
-      document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
+      try { applyLeftBg(eased); } catch (e) { }
     }
 
     // Public: adjustDarken(delta) — incrementally increase/decrease dark level like runSequence's applyDarken
@@ -551,14 +524,7 @@ const DEBUG = false;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
       this.darkLevelFloat = Math.min(1, Math.max(0, this.darkLevelFloat + step / maxSteps));
       const eased = ease(this.darkLevelFloat);
-      const css = getComputedStyle(document.documentElement);
-      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
-      const target = [255, 111, 168];
-      const mix = (a, b, t) => Math.round(a * (1 - t) + b * t);
-      const r = mix(baseLeft[0], target[0], eased);
-      const g = mix(baseLeft[1], target[1], eased);
-      const b = mix(baseLeft[2], target[2], eased);
-      document.documentElement.style.setProperty('--left-bg', `rgb(${r}, ${g}, ${b})`);
+      try { applyLeftBg(eased); } catch (e) { }
     }
 
     // Persistent cumulative accent: поддерживает уровень пульсации, который накапливается
