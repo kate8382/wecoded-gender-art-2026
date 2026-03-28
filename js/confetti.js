@@ -1,4 +1,5 @@
 // DOM-based confetti using inline SVG gender signs
+let conf;
 (function () {
   const DEBUG = false;
   const DEFAULT_DURATION = 5000; // ms
@@ -203,6 +204,11 @@
       if (btn) { try { btn.disabled = false; } catch (e) { } }
     }
 
+    // Публичный метод для безопасной остановки конфетти (alias для внутреннего _finish)
+    stop() {
+      try { this._finish(); } catch (e) { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('Confetti.stop error', e); }
+    }
+
     // Полная очистка слушателей и таймеров — вызывается извне при необходимости.
     destroy() {
       try {
@@ -213,8 +219,14 @@
     }
   }
 
-  // экспортируем синглтон внутри IIFE
-  const conf = new Confetti();
+  // экспортируем синглтон внутри IIFE, т.е. создаём экземпляр и делаем его доступным глобально, а также через CommonJS/ESM-совместимый экспорт
+  conf = new Confetti();
   window.Confetti = conf;
 
+  // CommonJS/ESM-friendly export: позволяем импортировать экземпляр как модуль
+  try { if (typeof exports !== 'undefined') exports.Confetti = conf; } catch (e) { }
+  try { if (typeof module !== 'undefined' && module.exports) module.exports = conf; } catch (e) { }
 })();
+
+// ESM default export
+export default conf;
