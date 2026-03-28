@@ -25,7 +25,7 @@
   pointer-events: none;
   opacity: 0.12;
   background-repeat: no-repeat;
-  background-size: 100px 100px;
+  background-size: var(--bg-size) var(--bg-size);
   filter: brightness(1.1) saturate(0.05) drop-shadow(0 4px rgba(0, 0, 0, 0.06));
 }
 
@@ -33,7 +33,7 @@
   left: 0;
   background-image: url('../img/venus.svg');
   background-position: 20% 11%;
-  background-size: 100px 100px;
+  background-size: var(--bg-size) var(--bg-size);
   /* Позволяет JS управлять пульсацией через --accent-pulse (0..1) */
   transform-origin: center center;
   will-change: transform, filter, opacity;
@@ -187,8 +187,8 @@
 
 .pan-target.pan-target--left {
   /* позиционирование падающих элементов для левой чаши */
-  left: 18%;
-  top: 57%;
+  left: var(--pan-left);
+  top: var(--pan-top);
 }
 
 /* падающие элементы внутри левого контейнера, у которых z-index: 50 выше упавших элементов (.pan-target__item: z-index: 20), но ниже основного ноутбука z-index: 60 */
@@ -202,8 +202,8 @@
 
 .pan-target.pan-target--right {
   /* позиционирование падающих элементов для правой чаши */
-  left: 72%;
-  top: 57%;
+  left: var(--pan-right);
+  top: var(--pan-top);
 }
 
 /* устанавливаем основной ноутбук (z-index: 60) выше падающих элементов (z-index: 50) */
@@ -211,7 +211,7 @@
 .pan-target--left.pan-target__main {
   position: absolute;
   left: 50%;
-  bottom: 12px;
+  bottom: var(--pan-main-bottom);
   z-index: 60;
   width: 100%;
   transform: translateX(-50%);
@@ -229,7 +229,7 @@
 .pan-target__main {
   position: absolute;
   left: 50%;
-  bottom: 12px;
+  bottom: var(--pan-main-bottom);
   z-index: 200;
   pointer-events: none;
   transform: translateX(-50%);
@@ -251,8 +251,8 @@
   left: 50%;
   z-index: 100;
   pointer-events: none;
-  width: 36px;
-  height: 36px;
+  width: var(--item-size);
+  height: var(--item-size);
   transform: translateX(-50%);
 }
 
@@ -270,8 +270,8 @@
   top: 0;
   /* ниже основного ноутбука, который имеет более высокий z-index (z-index: 200) */
   z-index: 40;
-  width: 40px;
-  height: 40px;
+  width: var(--ghost-size);
+  height: var(--ghost-size);
   transform: translate(var(--tx, 0px), var(--ty, 0px));
   opacity: 0;
   /* более плавный переход для мягкого падения */
