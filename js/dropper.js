@@ -1,4 +1,4 @@
-import { getRowCount, layoutPanItems, computeTargetPosition, updatePanItemsContainerHeight, adjustMainForPile, updateLaptopScaleForPan, parseColor, ease } from './layout.js';
+import { getRowCount, layoutPanItems, computeTargetPosition, updatePanItemsContainerHeight, adjustMainForPile, updateLaptopScaleForPan, parseColor, ease, readRootVars } from './layout.js';
 import { icons, defaultSequence } from './config.js';
 
 const DEBUG = false;
@@ -244,8 +244,7 @@ const DEBUG = false;
           // finalize функция, которая выполняется при завершении анимации или по таймауту, чтобы гарантировать, что элемент будет добавлен в чашу даже если событие transitionend не сработает
           const finalize = (opts = {}) => {
             if (finished) return;
-            let rootCss = null;
-            try { rootCss = getComputedStyle(document.documentElement); } catch (e) { rootCss = null; }
+            const vars = readRootVars('--accent-boost');
             finished = true;
             if (timeoutId) clearTimeout(timeoutId);
             // cancel any RAF-driven spiral
@@ -315,7 +314,7 @@ const DEBUG = false;
                       if (idx >= threshold) {
                         const pos = idx - threshold; // 0..2
                         const add = 0.01 * (1 + pos); // 0.01, 0.02, 0.03
-                        const cur = parseFloat((rootCss && rootCss.getPropertyValue('--accent-boost')) || 0) || 0;
+                        const cur = parseFloat(vars['--accent-boost'] || 0) || 0;
                         const next = Math.min(0.06, cur + add);
                         document.documentElement.style.setProperty('--accent-boost', String(next));
                       }
@@ -474,8 +473,8 @@ const DEBUG = false;
       const maxSteps = Number(this.opts.laptopMaxCount) || 6;
 
       // читаем базовый левый цвет из CSS-переменной `--left` и устанавливаем целевой акцент
-      const css = getComputedStyle(document.documentElement);
-      const baseLeft = parseColor(css.getPropertyValue('--left') || '#ffe6f3') || [255, 230, 243];
+      const vars = readRootVars('--left');
+      const baseLeft = parseColor(vars['--left'] || '#ffe6f3') || [255, 230, 243];
       const target = [255, 111, 168]; // accent pink
 
       const applyDarken = (delta) => {

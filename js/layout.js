@@ -85,3 +85,131 @@ export function computeTargetPosition(pan, offsets = {}) {
   const offY = Number(offsets.offsetY ?? pan.dataset.offsetY ?? 0);
   return { x: Math.round(cx + offX), y: Math.round(cy + offY) };
 }
+
+// Устанавливает явную высоту для контейнера элементов внутри панели, аналогично логике в Dropper._updatePanItemsContainerHeight
+export function updatePanItemsContainerHeight(list, pan, opts) {
+  if (!list) return;
+  const items = Array.from(list.querySelectorAll('.pan-target__item'));
+  const total = items.length;
+  if (!total) {
+    list.style.height = '';
+    list.style.top = '';
+    list.style.bottom = '';
+    return;
+  }
+
+  const rowSpacing = opts.rowSpacing;
+  const baseBottom = opts.baseBottom;
+  const itemH = opts.itemH;
+
+  const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
+  const rows = getRowCount(total, containerWidth, opts);
+
+  // требуемая высота: смещение снизу верхнего ряда + высота элемента + небольшой запас (6px) для предотвращения обрезки из-за округлений или стилей
+  const required = baseBottom + (rows - 1) * rowSpacing + itemH + 6;
+
+  // устанавливаем явную высоту для контейнера элементов, чтобы предотвратить обрезку при позиционировании элементов с отрицательным смещением и обеспечиваем правильное позиционирование относительно нижней части панели
+  list.style.height = required + 'px';
+  list.style.top = 'auto';
+  list.style.bottom = baseBottom + 'px';
+  if (pan) {
+    pan.style.minHeight = pan.style.minHeight || getComputedStyle(pan).minHeight;
+  }
+}
+
+// Позиционирование основного блока над стопкой — выносит логику из Dropper._adjustMainForPile
+export function adjustMainForPile(pan, opts) {
+  if (!pan) return;
+  const list = pan.querySelector('.pan-target__items');
+  const mainWrap = pan.querySelector('.pan-target__main');
+  if (!list || !mainWrap) return;
+
+  // убедиться, что обертка позиционирована (она уже должна быть на CSS)
+  mainWrap.style.position = mainWrap.style.position;
+
+  const items = Array.from(list.querySelectorAll('.pan-target__item'));
+  const total = items.length;
+  const baseBottom = opts.baseBottom;
+  const rowSpacing = opts.rowSpacing;
+  const itemH = opts.itemH;
+
+  if (!total) {
+    mainWrap.style.bottom = baseBottom + 'px';
+    return;
+  }
+
+  // вычислить количество рядов ,используя тот же алгоритм, что и для layoutPanItems
+  const containerWidth = list.clientWidth || list.getBoundingClientRect().width;
+  const rows = getRowCount(total, containerWidth, opts);
+
+  const topRowBottom = baseBottom + (rows - 1) * rowSpacing;
+  // позиционировать обертку так, чтобы основной элемент располагался над верхним рядом, с учетом заданного перекрытия для создания эффекта стопки
+  const overlap = opts.overlap; // сколько пикселей основной элемент должен перекрывать верхний ряд для создания эффекта стопки
+  const targetBottom = topRowBottom + itemH - overlap;
+  mainWrap.style.bottom = Math.max(baseBottom, targetBottom) + 'px';
+}
+
+// Рассчитывает и применяет ширину основного изображения ноутбука для панели (вынесено из Dropper._updateLaptopScaleForPan)
+export function updateLaptopScaleForPan(pan, opts) {
+  if (!pan) return;
+  const mainImg = pan.querySelector('.pan-target__main img');
+  if (!mainImg) return;
+  // только уменьшать ноутбук на левой панели (female)
+  const side = pan.dataset && pan.dataset.side;
+  const initial = opts.laptopInitialWidth;
+  if (side !== 'female') {
+    mainImg.style.width = initial + 'px';
+    return;
+  }
+  const list = pan.querySelector('.pan-target__items');
+  const count = list ? list.querySelectorAll('.pan-target__item').length : 0;
+  const min = opts.laptopMinWidth;
+  const maxCount = opts.laptopMaxCount;
+  const diff = initial - min;
+  const perItem = diff / maxCount;
+  const newWidth = Math.max(min, Math.round(initial - count * perItem));
+  mainImg.style.width = newWidth + 'px';
+}
+
+// Утилиты: парсинг цветов и easing
+export function parseColor(str) {
+  if (!str) return null;
+  str = String(str).trim();
+  if (str[0] === '#') {
+    const hex = str.slice(1);
+    if (hex.length === 3) {
+      return [
+        parseInt(hex[0] + hex[0], 16),
+        parseInt(hex[1] + hex[1], 16),
+        parseInt(hex[2] + hex[2], 16)
+      ];
+    }
+    if (hex.length === 6) {
+      return [
+        parseInt(hex.slice(0, 2), 16),
+        parseInt(hex.slice(2, 4), 16),
+        parseInt(hex.slice(4, 6), 16)
+      ];
+    }
+  }
+  const m = str.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+  if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+  return null;
+}
+
+// easing: easeInOutCubic
+export function ease(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// чтение нескольких CSS-переменных из :root за один вызов getComputedStyle
+export function readRootVars(...names) {
+  try {
+    const css = getComputedStyle(document.documentElement);
+    const out = {};
+    for (const n of names) {
+      out[n] = css.getPropertyValue(n);
+    }
+    return out;
+  } catch (e) { return {}; }
+}
