@@ -1,6 +1,8 @@
 import { getRowCount, layoutPanItems, computeTargetPosition } from './layout.js';
 import { icons, defaultSequence } from './config.js';
 
+const DEBUG = false;
+
 (function () {
   class Dropper {
     constructor(opts = {}) {
@@ -326,9 +328,9 @@ import { icons, defaultSequence } from './config.js';
               // избежать создания дублирующего основного изображения, когда оно уже существует
               const existing = main.querySelector('img');
               if (existing && existing.src && existing.src.indexOf(assetSrc) !== -1) {
-                console.debug('Dropper: main image already present for', pan && pan.dataset && pan.dataset.side);
+                if (typeof DEBUG !== 'undefined' && DEBUG) console.debug('Dropper: main image already present for', pan && pan.dataset && pan.dataset.side);
               } else {
-                console.debug('Dropper: creating main image for', pan && pan.dataset && pan.dataset.side);
+                if (typeof DEBUG !== 'undefined' && DEBUG) console.debug('Dropper: creating main image for', pan && pan.dataset && pan.dataset.side);
                 main.innerHTML = '';
                 const mImg = document.createElement('img');
                 mImg.src = assetSrc;
@@ -470,8 +472,8 @@ import { icons, defaultSequence } from './config.js';
       const ms = Math.max(0, Math.round(Number(delaySeconds) * 1000));
       const to = setTimeout(() => {
         try {
-          this.drop(step.src, { side: step.side, size: step.size, offsetX: step.offsetX, offsetY: step.offsetY }).catch(e => console.warn('scheduled drop failed', e));
-        } catch (e) { console.warn('scheduled drop invocation failed', e); }
+          this.drop(step.src, { side: step.side, size: step.size, offsetX: step.offsetX, offsetY: step.offsetY }).catch(e => { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('scheduled drop failed', e); });
+        } catch (e) { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('scheduled drop invocation failed', e); }
         this._schedules.delete(id);
       }, ms);
       this._schedules.set(id, to);
@@ -496,13 +498,13 @@ import { icons, defaultSequence } from './config.js';
     // audioDirector должен реализовывать метод `.schedule(timeInSeconds, callback)`.
     scheduleLeftBowlSequence(audioDirector) {
       if (!audioDirector || typeof audioDirector.schedule !== 'function') {
-        console.warn('Dropper.scheduleLeftBowlSequence requires an AudioDirector with schedule(t, fn)');
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('Dropper.scheduleLeftBowlSequence requires an AudioDirector with schedule(t, fn)');
         return;
       }
       try {
         // пауза падений между 9s и 11s
-        audioDirector.schedule(9, () => { try { this.suspendDrops(); } catch (e) { console.warn('suspendDrops failed', e); } });
-        audioDirector.schedule(11, () => { try { this.resumeDrops(); } catch (e) { console.warn('resumeDrops failed', e); } });
+        audioDirector.schedule(9, () => { try { this.suspendDrops(); } catch (e) { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('suspendDrops failed', e); } });
+        audioDirector.schedule(11, () => { try { this.resumeDrops(); } catch (e) { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('resumeDrops failed', e); } });
 
         // левая чаша: элементы для падения в указанные моменты времени
         // предпочтительно использовать элементы из defaultSequence, чтобы избежать дублирования путей; в качестве резервного варианта использовать `icons`
@@ -530,11 +532,11 @@ import { icons, defaultSequence } from './config.js';
             try {
               this.drop(step.src, { side: 'female' }).then(() => {
                 try { if (step.darken) this.adjustDarken(step.darken); } catch (e) { }
-              }).catch(e => console.warn('scheduled left-bowl drop failed', e));
-            } catch (e) { console.warn('scheduled left-bowl drop failed', e); }
+              }).catch(e => { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('scheduled left-bowl drop failed', e); });
+            } catch (e) { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('scheduled left-bowl drop failed', e); }
           });
         }
-      } catch (e) { console.warn('scheduling left bowl drops failed', e); }
+      } catch (e) { if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('scheduling left bowl drops failed', e); }
     }
 
     // Метод для запуска последовательности падений с поддержкой оптимизации соседних ноутбуков и затемнения

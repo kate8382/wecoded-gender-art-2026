@@ -1,5 +1,7 @@
 // Небольшой AudioDirector — планировщик вызовов по времени воспроизведения
 // Предназначен для простого тестирования синхронизации анимаций с audio.currentTime
+const DEBUG = false; // включить отладочные логи для AudioDirector (может быть полезно при настройке синхронизации)
+
 export default class AudioDirector {
   constructor(audioEl, opts = {}) {
     this.audio = audioEl;
@@ -17,14 +19,14 @@ export default class AudioDirector {
     }
   }
 
-  // schedule a callback at t seconds (floating). returns an id to cancel.
+  // производит планирование вызова функции через t секунд (с плавающей точкой). Возвращает id для отмены.
   schedule(tSeconds, fn) {
     const id = Math.random().toString(36).slice(2, 9);
     const entry = { t: Number(tSeconds) || 0, id, fn, fired: false };
     this.schedules.push(entry);
-    // keep schedules sorted by time for efficiency
+    // сортируем расписание по времени для эффективности
     this.schedules.sort((a, b) => a.t - b.t);
-    try { console.log('AudioDirector: scheduled', id, 'at', entry.t); } catch (e) { }
+    try { if (DEBUG) console.debug('AudioDirector: scheduled', id, 'at', entry.t); } catch (e) { }
     return id;
   }
 
@@ -56,21 +58,35 @@ export default class AudioDirector {
       const epsilon = 0.06; // 60ms
       for (const s of this.schedules) {
         if (!s.fired && ct + epsilon >= s.t) {
-          try { s.fn(); } catch (e) { console.warn('AudioDirector scheduled fn error', e); }
-          try { console.log('AudioDirector: firing', s.id, 'scheduledAt', s.t, 'currentTime', ct); } catch (e) { }
+          try { s.fn(); } catch (e) { if (DEBUG) console.warn('AudioDirector scheduled fn error', e); }
+          try { if (DEBUG) console.debug('AudioDirector: firing', s.id, 'scheduledAt', s.t, 'currentTime', ct); } catch (e) { }
           s.fired = true;
         }
       }
     } catch (e) {
-      console.warn('AudioDirector tick error', e);
+      if (DEBUG) console.warn('AudioDirector tick error', e);
     }
-    // continue polling
+    //  продолжаем опрос
     if (this._running) this._timer = setTimeout(this._tick, this._interval);
   }
 
-  // utility: schedule array of {t, fn}
+  // утилита: планирует массив задач вида {t, fn}
   scheduleAll(list) {
     if (!Array.isArray(list)) return [];
     return list.map(item => this.schedule(item.t, item.fn));
+  }
+
+  // Dispose: останавливает опрос и удаляет обработчики событий аудио, чтобы предотвратить утечки памяти при удалении AudioDirector
+  dispose() {
+    this._running = false;
+    try { if (this._timer) { clearTimeout(this._timer); this._timer = null; } } catch (e) { }
+    try {
+      if (this.audio) {
+        this.audio.removeEventListener('play', this._onPlay);
+        this.audio.removeEventListener('playing', this._onPlay);
+        this.audio.removeEventListener('pause', this._onPause);
+        this.audio.removeEventListener('ended', this._onPause);
+      }
+    } catch (e) { }
   }
 }

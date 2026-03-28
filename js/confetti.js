@@ -1,5 +1,6 @@
 // DOM-based confetti using inline SVG gender signs
 (function () {
+  const DEBUG = false;
   const DEFAULT_DURATION = 5000; // ms
   const DEFAULT_TOTAL = 200; // количество частиц (по половине для каждой стороны)
   const GRAVITY = 1200; // px/s^2
@@ -21,7 +22,7 @@
     const existing = document.getElementById(containerId);
     if (existing) return existing;
     // если контейнера нет в DOM — создаём, но логируем это (обычно в index.html он уже есть)
-    console.warn('Confetti: placeholder #' + containerId + ' not found — creating fallback container');
+    if (DEBUG) console.warn('Confetti: placeholder #' + containerId + ' not found — creating fallback container');
     const c = document.createElement('div');
     c.id = containerId;
     c.className = 'confetti-container';
@@ -71,7 +72,7 @@
       // слушаем событие celebrate от dropper — сохраняем ссылку на обработчик, чтобы можно было его убрать при необходимости
       this._onCelebrate = (e) => this.start();
       window.addEventListener('dropper:celebrate', this._onCelebrate);
-      console.debug('Confetti: initialized, container=', this.container ? '#' + this.container.id : 'none');
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.debug('Confetti: initialized, container=', this.container ? '#' + this.container.id : 'none');
     }
 
     // start(options) — options: { duration(ms), total, slow }
@@ -83,7 +84,7 @@
       const total = Number(opts.total) || DEFAULT_TOTAL; /// общее количество частиц для спауна (по половине для каждой стороны), используем для планирования спауна
       // убираем режим "slow" — эффекты замедления убираем, частицы всегда используют обычную скорость
       const slow = false;
-      console.debug('Confetti: start()', { duration, total });
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.debug('Confetti: start()', { duration, total });
       this.running = true;
       const btn = document.getElementById('startButton');
       if (btn) { try { btn.disabled = true; } catch (e) { } }

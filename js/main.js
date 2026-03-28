@@ -3,6 +3,8 @@ import AudioDirector from './audioDirector.js';
 import { zoomTimeline } from './config.js';
 import './confetti.js';
 
+const DEBUG = false;
+
 class MainApp {
   constructor(opts = {}) {
     this.opts = Object.assign({ audioSrc: 'audio/james-brown-3.mp3' }, opts);
@@ -71,7 +73,7 @@ class MainApp {
       if (page) { page.classList.remove('scene-active'); }
       try { document.body.classList.remove('zooming'); } catch (e) { }
       // очистить визуальные элементы сцены, чтобы следующий запуск вел себя как свежий
-      try { this.dropper.reset(); } catch (e) { console.warn('dropper.reset failed on ended', e); }
+      try { this.dropper.reset(); } catch (e) { if (DEBUG) console.warn('dropper.reset failed on ended', e); }
       try { this.dropper.celebrate(); } catch (e) { }
     });
   }
@@ -91,7 +93,7 @@ class MainApp {
         // если конфетти всё ещё активно или оставило таймеры — остановим их и включим кнопку
         try { if (window.Confetti && typeof window.Confetti._finish === 'function') window.Confetti._finish(); } catch (e) { }
         // подготовка свежей сцены перед воспроизведением; сначала сброс, чтобы _onAudioPlay мог запустить последовательность
-        try { this.dropper.reset(); } catch (e) { console.warn('reset failed', e); }
+        try { this.dropper.reset(); } catch (e) { if (DEBUG) console.warn('reset failed', e); }
         this.audio.muted = false;
         this.audio.currentTime = 0;
         // пользовательский запуск (специальные флаги не требуются)
@@ -104,13 +106,13 @@ class MainApp {
         // user-initiated start succeeded
         // если аудио всё ещё на паузе после play (браузер заблокировал unmute), показать fallback кнопку воспроизведения
         if (this.audio.paused) {
-          console.warn('audio.play() returned but audio is still paused — showing fallback play control');
+          if (DEBUG) console.warn('audio.play() returned but audio is still paused — showing fallback play control');
           this._createPlayButton(true, true);
         }
         // не скрывать overlay здесь — ждать, пока аудио действительно не начнётся (обрабатывается в _onAudioPlay)
         // ПРИМЕЧАНИЕ: не вызывать runSequence() здесь — _onAudioPlay запустит последовательность на событии 'play'
       } catch (err) {
-        console.warn('start button play failed', err);
+        if (DEBUG) console.warn('start button play failed', err);
       }
     });
 
@@ -168,7 +170,7 @@ class MainApp {
       };
       overlay.addEventListener('transitionend', onEnd);
       setTimeout(() => { if (!fired) done(); }, 260);
-    } catch (e) { console.warn('hideOverlay failed', e); }
+    } catch (e) { if (DEBUG) console.warn('hideOverlay failed', e); }
   }
 
   // Helper: показать overlay (восстановить display, затем удалить hidden/behind)
@@ -193,7 +195,7 @@ class MainApp {
             void theEnd.offsetWidth;
             const co = getComputedStyle(theEnd).opacity;
             if (co === '0') {
-              console.warn('MAIN: theEnd opacity remained 0 after adding .visible — applying final-visible class fallback');
+              if (DEBUG) console.warn('MAIN: theEnd opacity remained 0 after adding .visible — applying final-visible class fallback');
               theEnd.style.opacity = '';
               try { overlay.classList.add('final-visible'); } catch (e) { }
             }
@@ -215,7 +217,7 @@ class MainApp {
           try { overlay.classList.add('final-visible'); } catch (e) { }
         }
       } catch (e) { }
-    } catch (e) { console.warn('MAIN: _showOverlay computed failed', e); }
+    } catch (e) { if (DEBUG) console.warn('MAIN: _showOverlay computed failed', e); }
   }
 
   // аудиоплейбек всегда запускается явным действием пользователя (кнопка Start) — логика автозапуска удалена, так что нет необходимости в специальных флагах взаимодействия. Просто реагируем на событие 'playing' для запуска последовательности Dropper, гарантируя синхронизацию с фактическим началом воспроизведения аудио.
@@ -226,7 +228,7 @@ class MainApp {
     // очистим старые задачи директора перед планированием новых
     try { this.audioDirector.clear(); } catch (e) { }
     // регистрируем расписание паузы и падений в Dropper (через AudioDirector)
-    try { this.dropper.scheduleLeftBowlSequence(this.audioDirector); } catch (e) { console.warn('scheduleLeftBowlSequence failed', e); }
+    try { this.dropper.scheduleLeftBowlSequence(this.audioDirector); } catch (e) { if (DEBUG) console.warn('scheduleLeftBowlSequence failed', e); }
     // пометить body как в режиме зума (фон будет применён через CSS .zooming)
     try { document.body.classList.add('zooming'); } catch (e) { }
     // audio.play event fired — starting dropper sequence
@@ -263,7 +265,7 @@ class MainApp {
             return;
           }
           this.audioDirector.schedule(t, () => {
-            try { this.dropper.drop(step); } catch (e) { console.warn('dropper.drop failed from AudioDirector', e); }
+            try { this.dropper.drop(step); } catch (e) { if (DEBUG) console.warn('dropper.drop failed from AudioDirector', e); }
           });
         }
       });
@@ -275,20 +277,20 @@ class MainApp {
         let runSeqStarted = false;
         const startSeq = () => {
           if (runSeqStarted) return; runSeqStarted = true;
-          try { this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); } catch (e) { }
+          try { this.dropper.runSequence(seq).catch(err => { if (DEBUG) console.warn('Dropper sequence error', err); }); } catch (e) { }
         };
         const p = this._startContinuousZoom(zoomTimeline);
         zoomStarted = true;
-        p.then(() => { try { startSeq(); } catch (e) { } }).catch((e) => { console.warn('continuous zoom promise rejected', e); startSeq(); });
+        p.then(() => { try { startSeq(); } catch (e) { } }).catch((e) => { if (DEBUG) console.warn('continuous zoom promise rejected', e); startSeq(); });
         // безопасный fallback: убедиться, что последовательность запускается после zoomDuration + 800ms, даже если промис никогда не разрешается
         try { setTimeout(() => { try { startSeq(); } catch (e) { } }, Math.max(1000, (zoomDuration * 1000) + 800)); } catch (e) { }
       } else if (zoomTimeline && Array.isArray(zoomTimeline.scales) && zoomTimeline.scales.length) {
         //  дискретный zoom: расписать runSequence на запуск после окончания фазы зума
         this.audioDirector.schedule(zoomDuration, () => {
-          try { this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err)); } catch (e) { }
+          try { this.dropper.runSequence(seq).catch(err => { if (DEBUG) console.warn('Dropper sequence error', err); }); } catch (e) { }
         });
       } else {
-        this.dropper.runSequence(seq).catch(err => console.warn('Dropper sequence error', err));
+        this.dropper.runSequence(seq).catch(err => { if (DEBUG) console.warn('Dropper sequence error', err); });
       }
     }
     // если включен непрерывный зум в конфигурации, запускаем интерполяцию через RAF
@@ -306,7 +308,7 @@ class MainApp {
           const t = count === 1 ? 0 : (idx / (count - 1)) * total;
           const isLast = idx === (scales.length - 1);
           this.audioDirector.schedule(t, () => {
-            try { this.dropper.setBodyScale(scale); } catch (e) { console.warn('setBodyScale failed', e); }
+            try { this.dropper.setBodyScale(scale); } catch (e) { if (DEBUG) console.warn('setBodyScale failed', e); }
             // на финальном шаге снимаем режим zooming, чтобы сцена могла развернуться на весь экран
             if (isLast) {
               try { document.body.classList.remove('zooming'); } catch (e) { }
@@ -314,7 +316,7 @@ class MainApp {
           });
         });
       }
-    } catch (e) { console.warn('zoom timeline scheduling failed', e); }
+    } catch (e) { if (DEBUG) console.warn('zoom timeline scheduling failed', e); }
     // нет специальных флагов взаимодействия с пользователем для очистки
   }
 
@@ -363,7 +365,7 @@ class MainApp {
             resolve();
             return;
           }
-        } catch (e) { console.warn('continuous snap zoom step error', e); reject(e); return; }
+        } catch (e) { if (DEBUG) console.warn('continuous snap zoom step error', e); reject(e); return; }
         this._zoomRafId = requestAnimationFrame(step);
       };
 
