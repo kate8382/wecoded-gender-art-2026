@@ -42,7 +42,6 @@ class MainApp {
     this.audio.addEventListener('playing', () => { return this._onAudioPlay(); });
     // также реагируем на 'play', чтобы запускать зум как можно раньше при пользовательском воспроизведении
     this.audio.addEventListener('play', () => { return this._onAudioPlay(); });
-    this.audio.addEventListener('pause', () => { /* audio pause event */ });
     this.audio.addEventListener('ended', () => {
       // Разрешить повторное воспроизведение: пометить как не начатое, чтобы _onAudioPlay запустил последовательность при следующем воспроизведении.
       this._started = false;
@@ -91,7 +90,7 @@ class MainApp {
       // start button clicked — before actions
       try {
         // если конфетти всё ещё активно или оставило таймеры — остановим их и включим кнопку
-        try { if (window.Confetti && typeof window.Confetti._finish === 'function') window.Confetti._finish(); } catch (e) { }
+        try { if (window.Confetti && typeof window.Confetti.stop === 'function') window.Confetti.stop(); } catch (e) { }
         // подготовка свежей сцены перед воспроизведением; сначала сброс, чтобы _onAudioPlay мог запустить последовательность
         try { this.dropper.reset(); } catch (e) { if (DEBUG) console.warn('reset failed', e); }
         this.audio.muted = false;
@@ -265,7 +264,9 @@ class MainApp {
             return;
           }
           this.audioDirector.schedule(t, () => {
-            try { this.dropper.drop(step); } catch (e) { if (DEBUG) console.warn('dropper.drop failed from AudioDirector', e); }
+            try {
+              this.dropper.drop(step.src, { side: step.side, size: step.size, offsetX: step.offsetX, offsetY: step.offsetY });
+            } catch (e) { if (DEBUG) console.warn('dropper.drop failed from AudioDirector', e); }
           });
         }
       });
