@@ -1,30 +1,65 @@
 # WeCoded — Gender Equity (Frontend Art)
 
-Кратко
---
-Проект — небольшая фронтенд-инсталляция (HTML/CSS/JS) без сборщиков. Идея: музыкальная сцена с весами, на которые падают иконки (ноутбуки и мелкие предметы) в такт сцены; визуальные эффекты: постепенное затемнение, пульсация, масштабирование страницы, финал с конфетти.
+Participation: WeCoded 2026 challenge
+--------------------------------------
+This project is an entry for the [WeCoded 2026 Frontend Art challenge](https://dev.to/devteam/join-the-2026-wecoded-challenge-and-celebrate-underrepresented-voices-in-tech-through-writing--4828)
 
-Новый стартовый UX (обновление)
---
-Из-за ограничений браузеров по автопроигрыванию звука (аудиофайл не стартует без пользовательского жеста), приложение изменяет поведение начального экрана:
+Project summary
+---------------
+A small, dependency-free frontend installation (HTML/CSS/JS) that visualizes gender equity through a musical scene. The central motif is a pair of scales: while the paid, public work of women and men is shown as equal, the piece represents the often invisible unpaid domestic labor that falls on women in parallel to paid work. Visual effects include pulsing gender symbols, subtle gradient dimming, scaling/zoom, falling items into scale pans, and a celebratory finale.
 
-- По умолчанию окно открывается тёмным — цвет фона равен `var(--text-color)` (чёрно/тёмный фон). Сцена не показывается автoматически.
-- В центре экрана появляется крупная кнопка запуска со следующими стилями фонградиента, совпадающим с визуальной палитрой сцены:
-	- `background: linear-gradient(90deg, var(--left-bg) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--right) 100%);`
-	- При фокусе/ховере кнопка усиливает цвета, используя `--accent-blue: rgb(43, 124, 255)` и `--accent-pink: rgb(255, 111, 168)`.
-- После клика по кнопке проигрывается аудио и запускается визуальная сцена (падения предметов). Кнопка остаётся доступной и может служить для перезапуска.
-- По окончании музыки экран возвращается в тёмное состояние (`var(--text-color)`), поверх появляется заголовок `THE END` (в виде `h1`) и анимация конфетти из разноцветных гендерных знаков. Под заголовком остаётся та же центральная кнопка для повторного запуска.
+Vision
+------
+- The scales remain visually balanced to indicate formal equality.
+- The additional unpaid workload is expressed by repeated falling items into the pans and a pulsing/darkening visual metaphor on the female side.
+- The piece aims to show how continual unpaid labor and concurrent multitasking affect women's well-being.
 
-Эта версия UX делает демонстрацию надёжной без изменения браузерных флагов и сохраняет доступность: пользователь явно запускает звук и сцену.
+Video presentation
+------------------
+<video src="video/presentation.mp4" controls width="720">
+	Your browser does not support the video tag. Download the video: [video/presentation.mp4](video/presentation.mp4)
+</video>
 
-Что сделано (по шагам)
---
-- Разделил стили: `css/style.css` теперь импортирует `css/vars.css` и `css/scales.css`.
-- Разделил JS на модули ES: `js/config.js`, `js/layout.js`, `js/dropper.js`, `js/main.js`.
-- `Dropper` вынесен в `js/dropper.js` как ES-модуль, экспортируется и доступен через `window.Dropper`.
-- `js/main.js` переписан в класс `MainApp` и экспортируется как инстанс по умолчанию; он управляет аудио и стартом сцены.
-- Добавлен публичный API для `Dropper` (см. ниже).
-- Добавлена логика попытки muted-autoplay, retry при видимости/фокусе, кнопка Play для ручного запуска/повтора и `Dropper.reset()` для очистки сцены.
+Technical overview
+------------------
+This project is organized into small, focused modules and plain CSS files so it can run without a build step.
+
+Important files
+- `index.html` — demo page that loads assets and `js/main.js` (module).
+- `css/vars.css` — design tokens and breakpoint variables.
+- `css/scales.css` — scene layout, SVG scales, pan positioning.
+- `css/style.css` — global styles (start overlay, footer, page layout).
+- `js/config.js` — drop sequence and icon list.
+- `js/layout.js` — small layout utilities.
+- `js/dropper.js` — `Dropper` class: handles dropping, landing, spiral motion, ghost items.
+- `js/audioDirector.js` — scheduler that uses `audio.currentTime` for robust timing.
+- `js/main.js` — `MainApp` orchestrates audio, start overlay, zoom and sequence scheduling.
+- `js/confetti.js` — final confetti animation triggered by `dropper:celebrate`.
+
+Public API (high level)
+- `new Dropper(opts)` — creates a Dropper instance.
+- `dropper.drop(src, opts)` — drop a single item (returns Promise).
+- `dropper.runSequence(seq)` — run a sequence of drops (returns Promise).
+- `dropper.reset()` — clear current scene and ghosts.
+- `dropper.setBodyScale(scale)` — set page scale via CSS variable.
+- `dropper.celebrate()` — trigger finale and confetti.
+
+How to run locally
+------------------
+1. Open `index.html` in a modern browser (or use VS Code Live Server).
+2. Browsers block autoplay of audio. For demo purposes you can:
+   - Launch Chrome with `--autoplay-policy=no-user-gesture-required` on your demo machine, or
+   - Rely on the start-overlay UX: the user clicks the start button to enable audio and begin the scene.
+
+Design notes
+------------
+- Transform and scale are applied to a dedicated `.page__zoom` container to avoid layout and positioning conflicts with absolutely positioned children.
+- Audio timing is handled by `AudioDirector` (simple scheduler), which keeps `Dropper` focused on visual behavior.
+
+License & author
+-----------------
+This project is shared under the [MIT license](LICENSE). Author: [Ecaterina Sevciuc](https://github.com/kate8382/kate8382.git).
+
 
 Заметки для статьи
 --
@@ -60,152 +95,4 @@
 	- Решение: заменили эксперимент с CSS‑спиралью на JS‑реализацию через `requestAnimationFrame` и полярную траекторию (r = a + b·θ). Чтобы убрать «прыжок», добавили огибающую функцию `envelope = sin(p*π)`, которая обнуляет смещение в начале и в конце анимации; уменьшили радиус/число витков (вдвое) для компактности; в `finalize()` отменяем RAF, чтобы остановить анимацию и избежать конфликтов с land/transition; удалили лишние `animationend/transitionend`‑хендлеры для спиралей и восстановили повреждённые вспомогательные методы (`_ensureGhost` и др.).
 	- Влияние: спираль теперь рисуется JS-ом, ноутбук не поворачивается вокруг своей оси, дублирование падений предотвращено, и финализация проходит без визуальных «прыжков». Предлагается при необходимости вынести параметры `coils`, `startRadius`, `growth` в `drop()` опции для быстрого тюнинга.
 
-Кратко о том, где смотреть изменения
-- `js/audioDirector.js` — новый планировщик по `audio.currentTime`.
-- `js/main.js` — orchestration: старт, запуск зума (continuous/snap), отложенный запуск `dropper.runSequence`.
-- `js/dropper.js` — public `setBodyScale`, `runSequence`, pausing behaviour respected.
-- `index.html` — добавлен обёртка `.page__zoom`, футер вынесен за пределы зон масштаба.
-
-Рекомендация для статьи
-- Опишите архитектуру «Director (AudioDirector) + Actor (Dropper)», почему распределили ответственность так: директор планирует по времени, актор выполняет визуальные эффекты.
-- Отметьте решение про вынос трансформации в отдельный контейнер — это ключ к предотвращению побочных эффектов позиционирования.
-- Упомяните tradeoffs: polling‑scheduler прост и работоспособен, но для sub‑second точности можно рассмотреть WebAudio API.
-
-Структура проекта (важные файлы)
---
-- `index.html` — входная страница, подключает `css/style.css` и `js/main.js` (type="module").
-- `css/vars.css`, `css/scales.css`, `css/style.css` — переменные и визуальная сетка/панели.
-- `js/config.js` — список иконок и дефолтная последовательность падений.
-- `js/layout.js` — утилиты раскладки панелей/рядов/позиционирования.
-- `js/dropper.js` — основной класс `Dropper` (анимация падения, добавление в панель, layout).
-- `js/main.js` — класс `MainApp`, управляет аудио и orchestrates `Dropper`.
-- `audio/` — аудиофайлы (например `james-brown-2.mp3`).
-
-Ключевые публичные методы и API
---
-- `new Dropper(opts)` — создаёт экземпляр. Опции: `containerSelector`, `panSelector`, размеры, `defaultSequence`, `autoRun`.
-- `dropper.drop(src, opts)` — запустить одно падение (возвращает Promise с результатом).
-- `dropper.runSequence(sequence)` — запустить последовательность шагов (Promise).
-- `dropper.reset()` — очистить панели, удалить ghost'ы, сбросить затемнение.
-- `dropper.setDarkLevel(value)` — установить уровень затемнения (0..1).
-- `dropper.pulseAccent(strength)` — краткая пульсация акцента.
-- `dropper.setBodyScale(scale)` — масштабирование страницы.
-- `dropper.celebrate()` — триггерит событие `dropper:celebrate` (для конфетти).
-
-Как запустить локально (быстро)
---
-1. Откройте `index.html` локально (например через Live Server или просто откройте файл в браузере).
-2. Браузеры блокируют автоплей звука без пользовательского жеста. Есть 2 варианта:
-	 - Для демонстрации на вашей машине (kiosk/локально) можно запустить Chrome с флагом, позволяющим автоплей:
-		 ```powershell
-		 "C:\Program Files\Google\Chrome\Application\chrome.exe" --autoplay-policy=no-user-gesture-required
-		 ```
-		 Это локальная опция только для вашего запуска — другие пользователи не будут затронуты.
-	 - В обычном режиме страница попытается muted-autoplay, затем (если он не пройдёт) стартует визуал без звука и покажет кнопку Play. Нажмите Play, чтобы услышать звук и перезапустить сцену.
-
-Советы по отладке
---
-- Откройте DevTools → Console. Логи из `js/main.js` и `js/dropper.js` помогут понять причину блоков/ошибок.
-- Network → проверьте, что аудиофайл загружается (запрос `audio/james-brown-2.mp3`).
-- Если поведение не то, можно вручную вызвать из консоли:
-	- `window.dropper.runSequence(window.dropper.getDefaultSequence())` — запустить визуал.
-	- `window.__appAudio.play()` — попытаться запустить аудио (потребует жеста в большинстве браузеров).
-
-План работ (следующие шаги) — приоритеты
---
-1. Сгладить падение: улучшить easing, убрать «прыжок» финального элемента (в `dropper.drop`).
-2. Усилить тень/контраст у приземлённых элементов, добавить более плотную shadow для объёма.
-3. Пульсация левого акцента и плавный rise/zoom страницы (`setBodyScale`), триггер по счёту падений.
-4. Точная синхронизация с музыкой: простые временные таймлайны в `main.js` → при желании перейти на WebAudio API для точного тайминга.
-5. Конфетти (canvas) и финальный экран; событие `dropper:celebrate` будет триггером.
-
-Заметки о текущих ограничениях
---
-- Браузерная политика блокировки звука не обходится скриптами — либо нужно управляемое окружение (флаг), либо пользовательский жест.
-- Код уже имеет попытки muted-autoplay и retry при visibility/focus, но в реальном интернете гарантий звука на первом прогоне нет.
-
-Что я оставил/ожидаю от вас завтра
---
-- Мы можем продолжить с пункта 1 (сглаживание падения) — изменения лучше в `js/dropper.js` и связанные CSS-переменные в `css/vars.css`/`css/scales.css`.
-- Если захотите демонстрацию с автоплеем на вашей машине — скажите, добавлю `.bat` и короткий README‑раздел с инструкцией по созданию ярлыка.
-
-Контакты разработчика / заметки
---
-Файлы, которые я изменял: `js/main.js`, `js/dropper.js`, `js/config.js`, `js/layout.js`, `css/style.css`, `css/vars.css`, `css/scales.css`.
-
-Удачи — завтра начнём со сглаживания анимации и теней. Если хотите, могу подготовить ветку с экспериментом (если используете git).
-
-*** Конец README
-
-# Frontend Art: Gender Equity
-
-Проект — визуальная фронтенд-инсталляция, созданная в рамках конкурса "Frontend Art: Gender Equity" (WeCoded). Цель — показать тему гендерного равенства в IT через образ весов и набор метафорических предметов, падающих в чаши, который подчёркивает социальные и бытовые нагрузки.
-
-Статус
-------
-- В разработке (WIP). Репозиторий приватный до подачи заявки на участие в конкурсе.
-
-Описание проекта (видение)
---------------------------
-Проект показывает асимметрию обязанностей и ценностей: предметы (ноутбук, дом, коляска, бытовая техника и т.д.) падают в чаши весов, визуально изменяя баланс и фон. Я стремилась показать, как разное распределение обязанностей влияет на равновесие и видимость людей в технике.
-
-Как запустить
---------------
-1. Клонируйте (или откройте локально) репозиторий.
-2. Откройте `index.html` в браузере (статический проект, сборка не требуется).
-
-Примечания для демонстрации
---------------------------
-- По умолчанию на `DOMContentLoaded` запускается демонстрационная последовательность падений.
-- Для тестирования остановите автозапуск в `js/script.js` или добавьте элемент `data-autoplay="false"` (в будущем мы добавим кнопку Play/Restart).
-
-Лицензия
---------
-Проект выпускается под лицензией MIT. См. файл `LICENSE-MIT`.
-
-Автор
-------
-Ecaterina Sevciuc
-
-Roadmap / Что осталось
-----------------------
-- Точная настройка `pan-target` (offsets) для идеального попадания предметов в чаши.
-- Рефакторинг JS (очередь, улучшенная обработка ошибок, тесты).
-- Проверка доступности (aria, keyboard).
-- Уточнить стили и финальную цветовую палитру.
-
-Контакты
---------
-Если нужны права на использование или вопросы по проекту — свяжитесь с автором.
-# wecoded-gender-art-2026
-
-Minimal frontend demo for the WeCoded 2026 "Frontend Art: Gender Equity" challenge.
-
-How to view locally:
-
-1. Open the file [index.html](index.html) in a browser.
-
-What is included:
-- `index.html` — demo page (English, BEM class names, uses divs)
-- `css/style.css` — styles and simple arm animations
-
-Next steps (optional): polish SVG, add accessibility labels, export optimized PNG/SVG for submission.
-
-привет! мне нужно чтобы ты:
-1) досконально изучил файлы проекта js/config.js, layout.js, dropper.js, main.js, css/scales.css, style.css, vars.css, index.html, README.md
-2) нашел баги, несоответствия, дублирование и все что мешает реализации на данный момент логики. т.к. задумка (см README.md) простая, но мне кажется мы пошли не тем путем:
-   а) на данный момент у нас и #sym:body и .start-overlay имеют background: var(--text-color);, который при повторном нажатии на .start-button перекрывают градиент у .page.scene-active. и стили .start-overlay.transparent не помогают - потому что background: var(--text-color) остается (и тут надо понять чей #sym:body или .start-overlay), либо градиент у .page.scene-active вообще отсутствует (см скрин)
-   б) исходя из вышесказанного, у меня вопрос: для упрощения логики и разметки, не проще ли оставить (и можно ли так делать) кнопку и надпись у самого #sym:body? потому при запуске .page.scene-active, когда мы подключим анимацию зума, то по идеи на фоне боди должна будет приближать сцена в 3-5 этапов.
-   в) также по поводу анимации + аудиовоспроизведения - на данный момент, анимаци у нас в dropper.js, аудиовоспроизведение в  main.js, но я планирую анимацию (зум, падение лэптопов, падение в левую чашу др. элементов) напрямую синхронизировать под музыку. т.к. музыка с разными темпами, переходами, я думала реализовать что-то подобное:
-   const audio = new Audio('your-music.mp3');
-audio.play();
-
-// Вместо простого цикла, можно использовать время аудио:
-audio.ontimeupdate = () => {
-    if (audio.currentTime >= 10.5 && !droppedFirst) {
-        d.drop(...);
-        droppedFirst = true;
-    }
-};, т.е. посекундно отдавать команду какой/когда/что делать анимации.
-в связи с этим не логичнее аудиовоспроизведение и анимацию вывести в отдельный класс с публичными методами и применять их в dropper.js и/или main.js?
-3) и как правильней работать? т.е. я имею в виду начала я со сцены, перепрыгнула на начальное и финальное окна, а по итогу ни там, ни там ничего не доделано. я имею в виду пошагово идти от начала к концу, или как я сейчас прыгать в зависимости от логики и что не работает? на данный момент н-р, в сцене зум вообще не настроен, падение элементов, зум не синхронзированы с музыкой,  пульсация левого гендерного знака также не сделана, но вчера я взялась уже за начальное и финальные окна - и они тоже не настроены, конфети вообще еще не сделаны. посоветуй пожалуйста пошаговую реализацию, чтобы все было упорядочено и мы смогли проект закончить на этой недели.
+*** End of preserved notes ***
