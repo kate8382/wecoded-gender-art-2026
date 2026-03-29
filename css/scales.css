@@ -73,6 +73,7 @@
 .scene-scales-svg {
   width: 90%;
   height: auto;
+  margin: 0 auto;
   pointer-events: none;
 }
 
@@ -211,7 +212,7 @@
 .pan-target--left.pan-target__main {
   position: absolute;
   left: 50%;
-  bottom: var(--pan-main-bottom);
+  bottom: var(--pan-base-bottom);
   z-index: 60;
   width: 100%;
   transform: translateX(-50%);
@@ -229,7 +230,7 @@
 .pan-target__main {
   position: absolute;
   left: 50%;
-  bottom: var(--pan-main-bottom);
+  bottom: var(--pan-base-bottom);
   z-index: 200;
   pointer-events: none;
   transform: translateX(-50%);
@@ -251,8 +252,8 @@
   left: 50%;
   z-index: 100;
   pointer-events: none;
-  width: var(--item-size);
-  height: var(--item-size);
+  width: var(--pan-item-w);
+  height: var(--pan-item-h);
   transform: translateX(-50%);
 }
 

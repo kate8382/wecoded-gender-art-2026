@@ -9,6 +9,7 @@
   /* pan / layout настройка параметров отображается в виде пользовательских свойств CSS, поэтому JS может их считывать */
   --pan-item-w: 36px;
   --pan-item-h: 36px;
+  --ghost-size: 40px;
   --pan-gap: 4px;
   --pan-row-spacing: 22px;
   --pan-base-bottom: 12px;
@@ -16,15 +17,23 @@
   --laptop-initial-width: 84px;
   --laptop-min-width: 72px;
   --laptop-max-count: 6;
-  /* адаптивные переменные для сцен и панелей */
   --bg-size: 100px;
-  --pan-left: 18%;
-  --pan-right: 72%;
+  --pan-left: 23%;
+  --pan-right: 77%;
   --pan-top: 57%;
-  --pan-main-bottom: 12px;
-  --laptop-initial-width: clamp(84px, 6.5vw, 140px);
-  --item-size: clamp(28px, 3.2vw, 36px);
-  --ghost-size: clamp(32px, 4vw, 40px);
+}
+
+/*  */
+@media (max-width: 1024px) {}
+
+@media (max-width: 780px) {
+  .page__scene {
+    --bg-size: 70px;
+    --pan-base-bottom: 8px;
+    --laptop-initial-width: clamp(72px, 7.5vw, 120px);
+    --item-size: clamp(24px, 4.5vw, 32px);
+    --ghost-size: clamp(28px, 4.5vw, 36px);
+  }
 }
 
 /* Small breakpoint adjustments: raise pans and reduce sizes on narrow screens */
@@ -37,16 +46,6 @@
     --item-size: clamp(18px, 6.5vw, 28px);
     --ghost-size: clamp(20px, 6.5vw, 30px);
     --bg-size: 80px;
-    --pan-main-bottom: 8px;
-  }
-}
-
-@media (max-width: 780px) {
-  .page__scene {
-    --bg-size: 70px;
     --pan-base-bottom: 8px;
-    --laptop-initial-width: clamp(72px, 7.5vw, 120px);
-    --item-size: clamp(24px, 4.5vw, 32px);
-    --ghost-size: clamp(28px, 4.5vw, 36px);
   }
 }

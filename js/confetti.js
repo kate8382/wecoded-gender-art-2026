@@ -2,10 +2,10 @@
 let conf;
 (function () {
   const DEBUG = false;
-  const DEFAULT_DURATION = 5000; // ms
+  const DEFAULT_DURATION = 4500; // ms
   const DEFAULT_TOTAL = 200; // количество частиц (по половине для каждой стороны)
-  const GRAVITY = 1200; // px/s^2
-  const BURST_TIME = 900; // ms — время спауна/выстрела
+  const GRAVITY = 1600; // px/s^2 — увеличили, чтобы частицы падали быстрее
+  const BURST_TIME = 600; // ms — время спауна/выстрела (уменьшено для более энергичного выброса)
   const containerId = 'confettiContainer';
 
   // вставляем inline SVG templates (используем currentColor для stroke, чтобы можно было окрашивать через CSS)
@@ -92,6 +92,7 @@ let conf;
 
       const vw = Math.max(320, window.innerWidth || 1024);
       const vh = Math.max(200, window.innerHeight || 600);
+      const isSmall = vw < 420;
 
       const half = Math.floor(total / 2);
       const burstTime = Math.max(200, Math.min(BURST_TIME, requestedDuration ? Math.round(duration * 0.5) : BURST_TIME));
@@ -100,10 +101,10 @@ let conf;
       // функции для спауна частиц с левой и правой стороны, с вариациями скорости, угла и цвета для естественного вида
       const emitLeft = () => {
         if (emittedLeft >= half) return;
-        const peak = vh * 0.9;
-        const baseVy = -Math.sqrt(2 * GRAVITY * peak) * rand(0.85, 1.05);
+        const peak = vh * (isSmall ? 1.15 : 0.9);
+        const baseVy = -Math.sqrt(2 * GRAVITY * peak) * rand(isSmall ? 0.96 : 0.85, 1.06);
         const angleJitter = (Math.PI / 180) * rand(-18, 18);
-        const vx = Math.abs(baseVy) * Math.cos(Math.PI / 4 + angleJitter) * rand(0.9, 1.25);
+        const vx = Math.abs(baseVy) * Math.cos(Math.PI / 4 + angleJitter) * rand(1.02, 1.35);
         const vy = baseVy * rand(0.85, 1.05);
         const p = new Particle('female', venusSVG);
         const startLeft = rand(0.5, 6) / 100 * vw; // стартовая позиция с небольшой вариацией от левого края
@@ -112,8 +113,8 @@ let conf;
         p.vx = vx * (slow ? 0.5 : 1);
         p.vy = vy * (slow ? 0.5 : 1);
         p._expand = 0.002 + rand(0, 0.003);
-        p.scale = rand(0.7, 1.6);
-        p.ttl = rand(4.4, 6.2) * (slow ? 1.4 : 1);
+        p.scale = rand(0.8, 1.6);
+        p.ttl = rand(3.2, 4.6) * (slow ? 1.2 : 1);
         const c = femaleColors[Math.floor(rand(0, femaleColors.length))];
         p.el.style.color = c;
         p.attach(this.container);
@@ -123,10 +124,10 @@ let conf;
 
       const emitRight = () => {
         if (emittedRight >= half) return;
-        const peak = vh * 0.9;
-        const baseVy = -Math.sqrt(2 * GRAVITY * peak) * rand(0.85, 1.05);
+        const peak = vh * (isSmall ? 1.15 : 0.9);
+        const baseVy = -Math.sqrt(2 * GRAVITY * peak) * rand(isSmall ? 0.96 : 0.85, 1.06);
         const angleJitter = (Math.PI / 180) * rand(-18, 18);
-        const vx = -Math.abs(baseVy) * Math.cos(Math.PI / 4 + angleJitter) * rand(0.9, 1.25);
+        const vx = -Math.abs(baseVy) * Math.cos(Math.PI / 4 + angleJitter) * rand(1.02, 1.35);
         const vy = baseVy * rand(0.85, 1.05);
         const p = new Particle('male', marsSVG);
         const startRight = rand(94, 99.2) / 100 * vw;
@@ -135,8 +136,8 @@ let conf;
         p.vx = vx * (slow ? 0.5 : 1);
         p.vy = vy * (slow ? 0.5 : 1);
         p._expand = 0.002 + rand(0, 0.003);
-        p.scale = rand(0.7, 1.6);
-        p.ttl = rand(4.4, 6.2) * (slow ? 1.4 : 1);
+        p.scale = rand(0.8, 1.6);
+        p.ttl = rand(3.2, 4.6) * (slow ? 1.2 : 1);
         const c = maleColors[Math.floor(rand(0, maleColors.length))];
         p.el.style.color = c;
         p.attach(this.container);
@@ -144,20 +145,20 @@ let conf;
         emittedRight++;
       };
 
-      const leftInterval = Math.max(8, Math.round(burstTime / Math.max(1, half)));
-      const rightInterval = Math.max(8, Math.round(burstTime / Math.max(1, half)));
+      const leftInterval = Math.max(6, Math.round(burstTime / Math.max(1, half)));
+      const rightInterval = Math.max(6, Math.round(burstTime / Math.max(1, half)));
       this._emitterInterval = setInterval(() => {
         emitLeft(); emitRight();
         if (emittedLeft >= half && emittedRight >= half) {
           clearInterval(this._emitterInterval); this._emitterInterval = null;
         }
-      }, Math.max(10, Math.min(60, Math.round((leftInterval + rightInterval) / 2))));
+      }, Math.max(6, Math.min(40, Math.round((leftInterval + rightInterval) / 2))));
 
       this._last = performance.now();
       const loop = (now) => {
         const dt = Math.min(0.04, (now - this._last) / 1000);
         this._last = now;
-        const wind = (Math.sin(now / 1000) * 40) * (slow ? 0.35 : 1); // синусоидальное колебание ветра для более естественного движения
+        const wind = (Math.sin(now / 1000) * 60) * (slow ? 0.35 : 1); // увеличили амплитуду ветра для более выразительного рассеивания
         for (let i = this.particles.length - 1; i >= 0; i--) {
           const par = this.particles[i];
           if (par.vy < 0 && par._expand) {
@@ -169,7 +170,12 @@ let conf;
           par.vx *= 1 - (0.03 * dt);
           par.vy *= 1 - (0.015 * dt);
           par.update(dt);
-          // удалить, если за пределами экрана и прозрачность равна нулю
+          // ограничиваем выход за границы: если частица сильно уходит вбок — оттуда отталкиваем её, чтобы не терять визуальную область
+          if (par.x < -40) { par.x = -40; par.vx = Math.abs(par.vx) * 0.6; }
+          if (par.x > vw + 40) { par.x = vw + 40; par.vx = -Math.abs(par.vx) * 0.6; }
+          // если уходит слишком далеко вниз — удаляем
+          if (par.y > vh + 220) { par.remove(); this.particles.splice(i, 1); continue; }
+          // удалить по времени жизни
           if (par.life > par.ttl + 0.2) {
             par.remove();
             this.particles.splice(i, 1);

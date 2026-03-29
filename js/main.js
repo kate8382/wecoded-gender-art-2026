@@ -86,6 +86,21 @@ class MainApp {
     if (theEnd) { theEnd.hidden = true; theEnd.setAttribute('aria-hidden', 'true'); theEnd.classList.remove('visible'); }
     if (overlay) { this._showOverlay(overlay); }
     if (!btn) return;
+    // Нажатие/клавиатурная реакция: визуально пометить кнопку как "вдавленную" при mousedown/touchstart и при Enter
+    try {
+      btn.addEventListener('mousedown', () => btn.classList.add('pressed'));
+      btn.addEventListener('mouseup', () => btn.classList.remove('pressed'));
+      btn.addEventListener('mouseleave', () => btn.classList.remove('pressed'));
+      btn.addEventListener('touchstart', () => btn.classList.add('pressed'), { passive: true });
+      btn.addEventListener('touchend', () => btn.classList.remove('pressed'));
+      btn.addEventListener('keydown', (e) => {
+        if (e && (e.key === 'Enter' || e.keyCode === 13)) {
+          btn.classList.add('pressed');
+          setTimeout(() => { try { btn.classList.remove('pressed'); } catch (e) {} }, 150);
+        }
+      });
+    } catch (e) { }
+
     btn.addEventListener('click', async () => {
       // start button clicked — before actions
       try {
