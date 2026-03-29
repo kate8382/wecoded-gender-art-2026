@@ -96,7 +96,7 @@
   transform: translateX(4%) scaleX(1.22);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
 
   .scales-svg .scales-svg__panpath.left,
   .scales-svg .scales-svg__panpath.right {

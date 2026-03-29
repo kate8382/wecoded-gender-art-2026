@@ -31,7 +31,7 @@ body.zooming {
 
 /* при увеличении масштаба, предпочитайте фон body и скрывайте градиент страницы, чтобы фон body был виден */
 body.zooming .page.scene-active {
-  background: transparent !important;
+  background: transparent;
 }
 
 /* в течении увеличения масштаба, рендерьте градиент сцены внутри центрированного .page__zoom как окно,
@@ -213,7 +213,7 @@ button {
   border-radius: 14px;
   background: linear-gradient(90deg, var(--accent-pink) 0%, rgba(255, 230, 243, 0.95) 44%, rgba(232, 244, 255, 0.95) 56%, var(--accent-blue) 100%);
   /* светлая/мягкая тень чтобы быть заметной на тёмном фоне оверлея */
-  box-shadow: 0 12px 30px rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0,0,0,0.14);
+  box-shadow: 0 12px 30px rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.14);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.22s ease;
 }
 
@@ -229,13 +229,13 @@ button {
 .start-button:active {
   transform: translateY(2px) scale(0.98);
   /* более светлая внешняя тень + лёгкая внутренняя тень для ощущения глубины */
-  box-shadow: 0 8px 18px rgba(255, 255, 255, 0.045), inset 0 6px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 18px rgba(255, 255, 255, 0.045), inset 0 6px 12px rgba(0, 0, 0, 0.12);
 }
 
 /* Доступная подсветка при фокусе (без изменения градиента) */
 .start-button:focus-visible {
   outline: none;
-  box-shadow: 0 12px 30px rgba(255, 255, 255, 0.06), 0 0 0 4px rgba(255,255,255,0.04);
+  box-shadow: 0 12px 30px rgba(255, 255, 255, 0.06), 0 0 0 4px rgba(255, 255, 255, 0.04);
 }
 
 .the-end {
@@ -252,12 +252,6 @@ button {
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.36s ease, transform 0.36s cubic-bezier(0.2, 0.9, 0.2, 1);
-
-  @media (max-width: 420px) {
-
-    bottom: calc(100% + 12px);
-    letter-spacing: 2px;
-  }
 }
 
 .the-end.visible {
