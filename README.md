@@ -22,7 +22,11 @@ The central motif of this installation is a pair of scales that remain visually 
 
 Video presentation
 ------------------
-https://github.com/user-attachments/assets/f22f837d-18f3-4be3-b0e9-ed945496e998
+
+
+https://github.com/user-attachments/assets/deb7ac12-7865-4ac5-af44-22f3767447b8
+
+
 
 Technical overview
 ------------------
