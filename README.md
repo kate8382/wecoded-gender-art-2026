@@ -22,9 +22,7 @@ The central motif of this installation is a pair of scales that remain visually 
 
 Video presentation
 ------------------
-<video src="video/presentation.mp4" controls width="720">
-	Your browser does not support the video tag. Download the video: [video/presentation.mp4](video/presentation.mp4)
-</video>
+https://github.com/user-attachments/assets/f22f837d-18f3-4be3-b0e9-ed945496e998
 
 Technical overview
 ------------------
