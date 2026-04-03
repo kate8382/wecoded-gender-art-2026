@@ -2,6 +2,8 @@
 
 📖 Read the story behind this project on [dev.to](https://dev.to/kate8382/the-invisible-scales-a-frontend-art-performance-on-gender-equity-1n0o)
 
+📺 [Watch the performance on YouTube](https://youtu.be/eMlrY8YFxos)
+
 ## Participation: WeCoded 2026 challenge
 
 This project is an entry for the [WeCoded 2026 Frontend Art challenge](https://dev.to/devteam/join-the-2026-wecoded-challenge-and-celebrate-underrepresented-voices-in-tech-through-writing--4828)
