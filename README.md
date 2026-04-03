@@ -72,4 +72,5 @@ Public API (high level)
 ## License & Author
 
 This project is shared under the [MIT LICENSE](LICENSE). 
+
 Author: [Ecaterina Sevciuc](https://github.com/kate8382/kate8382.git).
